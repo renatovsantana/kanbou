@@ -2783,8 +2783,9 @@ export async function registerRoutes(
           const platforms = post.platform;
           if (Array.isArray(platforms)) {
             for (const p of platforms) {
-              if (p) {
-                const normalized = p.charAt(0).toUpperCase() + p.slice(1).toLowerCase();
+              const val = Array.isArray(p) ? p[0] : p;
+              if (val && typeof val === "string") {
+                const normalized = val.charAt(0).toUpperCase() + val.slice(1).toLowerCase();
                 byPlatform[normalized] = (byPlatform[normalized] || 0) + 1;
               }
             }
