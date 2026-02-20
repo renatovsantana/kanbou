@@ -975,6 +975,13 @@ export async function registerRoutes(
     res.json(updated);
   });
 
+  app.put("/api/notifications/read-insights", requireAuth, async (req, res) => {
+    const user = await getCurrentUser(req);
+    if (!user) return res.status(401).json({ message: "Não autenticado" });
+    await storage.markInsightNotificationsRead(user.role, user.clientId ?? undefined);
+    res.json({ success: true });
+  });
+
   app.put("/api/notifications/read-all", requireAuth, async (req, res) => {
     const user = await getCurrentUser(req);
     if (!user) return res.status(401).json({ message: "Não autenticado" });

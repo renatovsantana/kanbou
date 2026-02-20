@@ -70,6 +70,13 @@ export default function InsightsPage() {
     }
   }, [urlClientId]);
 
+  useEffect(() => {
+    apiRequest("PUT", "/api/notifications/read-insights").then(() => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
+    }).catch(() => {});
+  }, []);
+
   const { data: clients = [] } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
   });

@@ -110,6 +110,7 @@ export interface IStorage {
   createNotification(notification: InsertNotification): Promise<Notification>;
   markNotificationRead(id: number): Promise<Notification>;
   markAllNotificationsRead(recipientUserId: number): Promise<void>;
+  markInsightNotificationsRead(role: string, clientId?: number): Promise<void>;
 
   getCompetitors(): Promise<Competitor[]>;
   getCompetitorsByClient(clientId: number): Promise<Competitor[]>;
@@ -392,6 +393,22 @@ export class DatabaseStorage implements IStorage {
     await db.update(notifications)
       .set({ isRead: true })
       .where(eq(notifications.recipientUserId, recipientUserId));
+  }
+
+  async markInsightNotificationsRead(role: string, clientId?: number): Promise<void> {
+    const conditions = [
+      eq(notifications.type, "insight"),
+      eq(notifications.isRead, false),
+    ];
+    if (role === "client" && clientId) {
+      conditions.push(eq(notifications.recipientRole, "client"));
+      conditions.push(eq(notifications.clientId, clientId));
+    } else {
+      conditions.push(eq(notifications.recipientRole, role));
+    }
+    await db.update(notifications)
+      .set({ isRead: true })
+      .where(and(...conditions));
   }
 
   async getCompetitors(): Promise<Competitor[]> {
