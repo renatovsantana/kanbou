@@ -165,7 +165,7 @@ export default function Dashboard() {
     { label: "Total Materiais", value: clientSummary?.totalCards || 0, icon: FileEdit, accent: false },
     { label: "Em Aprovação", value: clientSummary?.pendingApproval || 0, icon: Clock, accent: (clientSummary?.pendingApproval || 0) > 0 },
     { label: "Aprovados", value: clientSummary?.approved || 0, icon: CheckCircle2, accent: false },
-    { label: "Agendados", value: (clientSummary?.scheduled || 0) + (clientSummary?.posted || 0), icon: CalendarDays, accent: false },
+    { label: "Agendados", value: clientSummary?.scheduled || 0, icon: CalendarDays, accent: false },
   ] : [
     { label: "Total Posts", value: totalPosts, icon: TrendingUp, accent: false },
     { label: "Publicados", value: published, icon: CheckCircle2, accent: true },
@@ -565,8 +565,12 @@ export default function Dashboard() {
                 </div>
               ) : (
                 clientSummary.recentCards.map((card) => {
-                  const typeColor = CARD_TYPE_COLORS[card.cardType as keyof typeof CARD_TYPE_COLORS] || "gray";
                   const typeLabel = CARD_TYPE_LABELS[card.cardType as keyof typeof CARD_TYPE_LABELS] || card.cardType;
+                  const STRIPE_COLORS: Record<string, string> = {
+                    post: "#3b82f6", material_offline: "#f59e0b", material_digital: "#a855f7",
+                    copy: "#10b981", roteiro: "#ef4444", identidade_visual: "#ec4899", geral: "#6b7280",
+                  };
+                  const stripeColor = STRIPE_COLORS[card.cardType] || "#6b7280";
                   return (
                     <div
                       key={card.id}
@@ -574,7 +578,7 @@ export default function Dashboard() {
                       data-testid={`client-card-${card.id}`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className={`w-1 h-10 rounded-full bg-${typeColor}-500 flex-shrink-0`} />
+                        <div className="w-1 h-10 rounded-full flex-shrink-0" style={{ backgroundColor: stripeColor }} />
                         <div className="min-w-0">
                           <p className="text-sm font-medium truncate">{card.title}</p>
                           <p className="text-xs text-muted-foreground truncate">{typeLabel}</p>

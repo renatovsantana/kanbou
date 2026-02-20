@@ -1126,7 +1126,7 @@ export async function registerRoutes(
       if (!user) return res.status(401).json({ message: "Não autenticado" });
 
       const clientId = user.role === "client" ? user.clientId : null;
-      if (!clientId) return res.json({ columns: [], recentCards: [], totalCards: 0 });
+      if (!clientId) return res.json({ columns: [], recentCards: [], totalCards: 0, pendingApproval: 0, approved: 0, revision: 0, rejected: 0, scheduled: 0, posted: 0, finished: 0, inProgress: 0 });
 
       const columns = await storage.getKanbanColumnsByClient(clientId);
       const cards = await storage.getKanbanCardsByClient(clientId);
