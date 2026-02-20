@@ -452,3 +452,93 @@
     animation: none;
   }
 }
+
+/* Insights cloud animations */
+.insights-clouds {
+  overflow: hidden;
+}
+
+.insights-cloud {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(40px);
+  opacity: 0.07;
+  background: hsl(var(--primary));
+}
+
+.dark .insights-cloud {
+  opacity: 0.05;
+}
+
+.insights-cloud-1 {
+  width: 280px;
+  height: 100px;
+  top: 12%;
+  animation: cloud-float-1 25s ease-in-out infinite;
+}
+
+.insights-cloud-2 {
+  width: 220px;
+  height: 80px;
+  top: 35%;
+  right: -60px;
+  animation: cloud-float-2 30s ease-in-out infinite;
+}
+
+.insights-cloud-3 {
+  width: 320px;
+  height: 110px;
+  top: 55%;
+  animation: cloud-float-3 35s ease-in-out infinite;
+}
+
+.insights-cloud-4 {
+  width: 180px;
+  height: 70px;
+  top: 75%;
+  right: 10%;
+  animation: cloud-float-4 28s ease-in-out infinite;
+}
+
+.insights-cloud-5 {
+  width: 240px;
+  height: 90px;
+  top: 90%;
+  animation: cloud-float-5 32s ease-in-out infinite;
+}
+
+@keyframes cloud-float-1 {
+  0% { left: -280px; }
+  50% { left: 60%; }
+  100% { left: -280px; }
+}
+
+@keyframes cloud-float-2 {
+  0% { right: -220px; }
+  50% { right: 50%; }
+  100% { right: -220px; }
+}
+
+@keyframes cloud-float-3 {
+  0% { left: -320px; }
+  50% { left: 40%; }
+  100% { left: -320px; }
+}
+
+@keyframes cloud-float-4 {
+  0% { right: -180px; }
+  50% { right: 60%; }
+  100% { right: -180px; }
+}
+
+@keyframes cloud-float-5 {
+  0% { left: -240px; }
+  50% { left: 70%; }
+  100% { left: -240px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .insights-cloud {
+    animation: none !important;
+  }
+}

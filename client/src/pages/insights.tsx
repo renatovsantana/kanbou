@@ -140,7 +140,16 @@ export default function InsightsPage() {
     : "";
 
   return (
-    <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-6">
+    <div className="relative min-h-full overflow-hidden">
+      <div className="insights-clouds pointer-events-none absolute inset-0 z-0" aria-hidden="true">
+        <div className="insights-cloud insights-cloud-1" />
+        <div className="insights-cloud insights-cloud-2" />
+        <div className="insights-cloud insights-cloud-3" />
+        <div className="insights-cloud insights-cloud-4" />
+        <div className="insights-cloud insights-cloud-5" />
+      </div>
+
+      <div className="relative z-10 p-4 md:p-6 max-w-4xl mx-auto space-y-6">
       <div className="relative rounded-xl bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-yellow-500/10 dark:from-amber-500/15 dark:via-orange-500/10 dark:to-yellow-500/5 p-6 overflow-hidden">
         <svg className="absolute bottom-0 left-0 w-full pointer-events-none" viewBox="0 0 1200 120" preserveAspectRatio="none" style={{ height: '60px' }}>
           <path className="insights-wave insights-wave-1" d="M0,60 C150,100 350,0 500,50 C650,100 850,20 1000,60 C1100,80 1150,40 1200,60 L1200,120 L0,120 Z" fill="currentColor" style={{ color: 'hsl(var(--primary) / 0.06)' }} />
@@ -387,6 +396,7 @@ export default function InsightsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
     </div>
   );
 }
