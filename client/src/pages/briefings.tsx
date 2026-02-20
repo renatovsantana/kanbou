@@ -86,7 +86,6 @@ const BRIEFING_QUESTIONS: BriefingPhase[] = [
     { id: "q34", text: "Sua empresa ou algum produto que você comercializa possui uma história?", required: true },
     { id: "q35", text: "Você tem alguma referência visual?", type: "radio", options: ["Sim", "Não"], required: true },
     { id: "q35_images", text: "Envie suas imagens de referência (máximo 5 imagens, 2MB cada):", type: "image-upload", conditionalOn: { questionId: "q35", value: "Sim" }, maxImages: 5, maxSizeMB: 2, required: true },
-    { id: "q36", text: "Envie arquivos adicionais que possam ajudar no projeto (logos, documentos, manuais, materiais existentes, etc.):", type: "file-upload", required: false },
   ]},
 ];
 
@@ -137,6 +136,8 @@ function generatePdfContent(briefing: Briefing, answers: Record<string, any>): s
           html += `<img src="${window.location.origin}${url}" />`;
         }
         html += `</div>`;
+      } else if (typeof answer === "object" && answer !== null && answer.fileUrl) {
+        html += `<a href="${window.location.origin}${answer.fileUrl}" target="_blank">${answer.fileName || "Arquivo anexado"}</a>`;
       } else if (Array.isArray(answer)) {
         html += `<div class="badge-list">`;
         for (const a of answer) {
@@ -398,8 +399,13 @@ export default function BriefingsPage() {
                           </Badge>
                         ))}
                       </div>
+                    ) : typeof answer === "object" && answer !== null && answer.fileUrl ? (
+                      <a href={answer.fileUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary underline flex items-center gap-1.5">
+                        <FileText className="w-3.5 h-3.5" />
+                        {answer.fileName || "Arquivo anexado"}
+                      </a>
                     ) : (
-                      <p className="text-sm">{answer}</p>
+                      <p className="text-sm">{String(answer)}</p>
                     )}
                   </div>
                 );
