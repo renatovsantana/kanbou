@@ -1,15 +1,15 @@
 import { cn } from "@/lib/utils";
 
 const statusConfig = {
-  "Aguardando Agendamento": {
-    color: "bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300 border-orange-200 dark:border-orange-800",
-    dot: "bg-orange-500",
-    label: "Aguardando Agendamento",
-  },
   Agendado: {
     color: "bg-primary/15 text-foreground border-primary/25",
     dot: "bg-primary",
     label: "Agendado",
+  },
+  Postado: {
+    color: "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800",
+    dot: "bg-emerald-500",
+    label: "Postado",
   },
   Publicado: {
     color: "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800",

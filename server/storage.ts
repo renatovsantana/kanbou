@@ -601,7 +601,7 @@ export class DatabaseStorage implements IStorage {
   async getScheduledKanbanCards(): Promise<{ card: KanbanCard; columnTitle: string }[]> {
     const allColumns = await db.select().from(kanbanColumns);
     const scheduledColumnIds = allColumns
-      .filter(c => c.title === "Agendados" || c.title === "Agendamento")
+      .filter(c => c.title === "Agendados" || c.title === "Postados")
       .map(c => c.id);
     if (scheduledColumnIds.length === 0) return [];
     const cards = await db.select().from(kanbanCards)

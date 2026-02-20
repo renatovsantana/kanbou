@@ -141,17 +141,23 @@ export default function CalendarView() {
     Agendado: "Agendado",
     published: "Publicado",
     Publicado: "Publicado",
+    Postado: "Postado",
     pending: "Pendente",
     Pendente: "Pendente",
     approved: "Aprovado",
     Aprovado: "Aprovado",
     rejected: "Rejeitado",
     Rejeitado: "Rejeitado",
-    "Aguardando Agendamento": "Aguardando Agendamento",
+  };
+
+  const STATUS_COLORS: Record<string, string> = {
+    Agendado: "border-l-blue-500",
+    Postado: "border-l-emerald-500",
+    Publicado: "border-l-emerald-500",
   };
 
   const renderItemCard = (item: CalendarItem) => (
-    <div key={item.id} className="flex flex-col sm:flex-row gap-3 p-4 rounded-md bg-muted/30 hover-elevate transition-all" data-testid={`calendar-item-${item.id}`}>
+    <div key={item.id} className={`flex flex-col sm:flex-row gap-3 p-4 rounded-md bg-muted/30 hover-elevate transition-all border-l-4 ${STATUS_COLORS[item.status] || "border-l-gray-300"}`} data-testid={`calendar-item-${item.id}`}>
       <div className="flex-shrink-0">
         <div className="w-11 h-11 rounded-md bg-card flex items-center justify-center gap-1 border border-border">
           {item.platform.length > 0 ? (
@@ -299,10 +305,14 @@ export default function CalendarView() {
                     locale={ptBR}
                     className="rounded-md border-none shadow-none w-full flex justify-center"
                     modifiers={{
+                      hasScheduled: (d) => filteredItems.some(i => i.scheduledDate && isSameDay(new Date(i.scheduledDate), d) && (i.status === "Agendado" || i.status === "scheduled")),
+                      hasPosted: (d) => filteredItems.some(i => i.scheduledDate && isSameDay(new Date(i.scheduledDate), d) && (i.status === "Postado" || i.status === "Publicado" || i.status === "published")),
                       hasPost: (d) => filteredItems.some(i => i.scheduledDate && isSameDay(new Date(i.scheduledDate), d)),
                     }}
                     modifiersStyles={{
-                      hasPost: { fontWeight: 'bold', textDecoration: 'underline', color: 'hsl(135, 55%, 58%)' },
+                      hasPost: { fontWeight: 'bold' },
+                      hasScheduled: { fontWeight: 'bold', color: 'hsl(217, 91%, 60%)' },
+                      hasPosted: { fontWeight: 'bold', color: 'hsl(160, 60%, 45%)' },
                     }}
                   />
                 </CardContent>

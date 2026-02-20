@@ -965,7 +965,7 @@ export async function registerRoutes(
           if (templateObj.platform) platforms = [templateObj.platform];
         }
 
-        const isConfirmedScheduled = columnTitle === "Agendados";
+        const status = columnTitle === "Postados" ? "Postado" : "Agendado";
 
         return {
           id: `kanban-${card.id}`,
@@ -976,7 +976,7 @@ export async function registerRoutes(
           content: templateObj.caption || card.description || "",
           platform: platforms,
           scheduledDate: templateObj.publishDate || card.createdAt,
-          status: isConfirmedScheduled ? "Agendado" : "Aguardando Agendamento",
+          status,
           cardType: card.cardType,
           source: "kanban" as const,
         };
