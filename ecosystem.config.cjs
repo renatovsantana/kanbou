@@ -6,7 +6,7 @@ module.exports = {
       cwd: "/var/www/kanbou",
       env: {
         NODE_ENV: "production",
-        PORT: 5000,
+        PORT: 5001,
       },
       instances: 1,
       exec_mode: "fork",
