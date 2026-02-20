@@ -1,35 +1,145 @@
-# Guia de Deploy - Shift Agency Manager
+# Guia de Deploy - Kanbou (Shift Agency Manager)
 
 ## Requisitos do Servidor (Hostinger VPS)
 
-- **Node.js** 20+ (recomendado: 20 LTS)
-- **PostgreSQL** 15+
-- **npm** 10+
-- **Git**
+- **Ubuntu** 22.04+ (recomendado)
+- **Node.js** 20+ (instalado automaticamente pelo script)
+- **PostgreSQL** 15+ (instalado automaticamente pelo script)
+- **Nginx** (instalado automaticamente pelo script)
+- **Mínimo**: 2GB RAM, 20GB disco
+
+---
+
+## Deploy Rápido (Recomendado)
+
+### 1. Acesse o VPS via SSH
+
+```bash
+ssh root@SEU_IP_DO_VPS
+```
+
+### 2. Baixe e rode o script de setup
+
+```bash
+curl -sL https://raw.githubusercontent.com/renatovsantana/kanbou/main/scripts/setup-server.sh -o setup.sh
+chmod +x setup.sh
+bash setup.sh seudominio.com.br
+```
+
+O script faz tudo automaticamente:
+- Instala Node.js, PostgreSQL, Nginx, PM2, Certbot
+- Cria o banco de dados com senha segura
+- Clona o repositório e compila
+- Configura Nginx como proxy reverso
+- Configura SSL/HTTPS com certificado gratuito
+
+### 3. Anote as credenciais
+
+Ao final do script, ele mostra as credenciais do banco. **Guarde essas informações!**
+
+### 4. Configure o Google Drive (opcional)
+
+Edite o arquivo `.env`:
+
+```bash
+nano /var/www/kanbou/.env
+```
+
+Preencha as credenciais do Google Drive:
+
+```env
+GOOGLE_CLIENT_ID=seu-client-id
+GOOGLE_CLIENT_SECRET=seu-client-secret
+GOOGLE_REFRESH_TOKEN=seu-refresh-token
+```
+
+Reinicie:
+
+```bash
+pm2 restart kanbou
+```
+
+---
+
+## Configuração de DNS (Registro.br)
+
+### Registros necessários no Registro.br:
+
+Acesse https://registro.br > faça login > selecione seu domínio > "DNS" > "Editar zona"
+
+| Tipo  | Nome              | Valor                      | TTL   |
+|-------|-------------------|----------------------------|-------|
+| **A** | **@**             | `SEU_IP_DO_VPS`            | 3600  |
+| **A** | **www**            | `SEU_IP_DO_VPS`            | 3600  |
+
+**Exemplo** (se o IP do seu VPS for `154.56.78.90`):
+
+| Tipo  | Nome              | Valor                      | TTL   |
+|-------|-------------------|----------------------------|-------|
+| A     | @                 | 154.56.78.90               | 3600  |
+| A     | www               | 154.56.78.90               | 3600  |
+
+### Passo a passo no Registro.br:
+
+1. Acesse https://registro.br e faça login
+2. Clique no seu domínio
+3. Vá em **"DNS"** > **"Editar zona"**
+4. Se usar DNS do Registro.br:
+   - Apague os registros existentes (se houver)
+   - Adicione um registro **tipo A**, nome **@**, valor **IP do VPS**, TTL **3600**
+   - Adicione um registro **tipo A**, nome **www**, valor **IP do VPS**, TTL **3600**
+   - Clique em **Salvar**
+5. Se usar DNS da Hostinger:
+   - No Registro.br, altere os servidores DNS para os da Hostinger:
+     - `ns1.dns-parking.com`
+     - `ns2.dns-parking.com`
+   - Configure os registros A no painel da Hostinger
+
+**IMPORTANTE**: A propagação do DNS pode levar de 2 a 48 horas. Normalmente leva de 15 a 30 minutos.
+
+### Verificar se o DNS está funcionando:
+
+```bash
+# No terminal do VPS ou do seu computador:
+dig seudominio.com.br +short
+# Deve retornar o IP do VPS
+
+nslookup seudominio.com.br
+# Deve mostrar o IP do VPS
+```
+
+### Após o DNS propagar, configure o SSL:
+
+Se o SSL não foi configurado durante o setup (porque o DNS ainda não tinha propagado):
+
+```bash
+certbot --nginx -d seudominio.com.br -d www.seudominio.com.br
+```
+
+---
 
 ## Variáveis de Ambiente
 
-Crie um arquivo `.env` na raiz do projeto com as seguintes variáveis:
+O arquivo `.env` fica em `/var/www/kanbou/.env`:
 
 ```env
-# Banco de Dados PostgreSQL
-DATABASE_URL=postgresql://usuario:senha@localhost:5432/shift_agency
+# Banco de dados (gerado automaticamente pelo setup)
+DATABASE_URL=postgresql://kanbou_user:SENHA@localhost:5432/kanbou
 
-# Sessão (gere uma string aleatória longa)
-SESSION_SECRET=gere-uma-string-aleatoria-segura-aqui
+# Sessão (gerado automaticamente pelo setup)
+SESSION_SECRET=string-aleatoria-gerada
 
 # Servidor
 PORT=5000
 NODE_ENV=production
 
-# Google Drive (OAuth2)
-GOOGLE_CLIENT_ID=seu-client-id-do-google
-GOOGLE_CLIENT_SECRET=seu-client-secret-do-google
-GOOGLE_REFRESH_TOKEN=seu-refresh-token-do-google
-
-# OpenAI (opcional - para sugestões de tags por IA)
-OPENAI_API_KEY=sua-chave-openai
+# Google Drive OAuth2 (preencher manualmente)
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_REFRESH_TOKEN=
 ```
+
+---
 
 ## Como Obter as Credenciais do Google Drive
 
@@ -37,7 +147,7 @@ OPENAI_API_KEY=sua-chave-openai
 2. Crie um novo projeto ou selecione um existente
 3. Ative a **Google Drive API**
 4. Em "Credenciais", crie um **ID do cliente OAuth 2.0** (tipo: Aplicativo da Web)
-5. Adicione `http://localhost:5000/api/auth/google/callback` como URI de redirecionamento autorizado
+5. Adicione `https://seudominio.com.br/api/auth/google/callback` como URI de redirecionamento
 6. Anote o **Client ID** e **Client Secret**
 7. Para obter o **Refresh Token**, use o [OAuth 2.0 Playground](https://developers.google.com/oauthplayground/):
    - Configure com seu Client ID e Secret (ícone de engrenagem)
@@ -45,149 +155,145 @@ OPENAI_API_KEY=sua-chave-openai
    - Troque o código de autorização por tokens
    - Copie o **Refresh Token**
 
-## Instalação e Deploy
+---
 
-### 1. Clone o repositório no VPS
-
-```bash
-git clone <url-do-repositorio> /var/www/shift-agency
-cd /var/www/shift-agency
-```
-
-### 2. Instale as dependências
-
-```bash
-npm install
-```
-
-### 3. Configure o banco de dados
-
-```bash
-# Crie o banco de dados PostgreSQL
-sudo -u postgres createdb shift_agency
-
-# Aplique o schema
-npm run db:push
-```
-
-### 4. Compile o projeto
-
-```bash
-npm run build
-```
-
-Isso gera:
-- `dist/public/` - Frontend compilado (arquivos estáticos)
-- `dist/index.cjs` - Backend compilado
-
-### 5. Inicie o servidor
-
-```bash
-npm start
-```
-
-O servidor inicia na porta definida em `PORT` (padrão: 5000).
-
-### 6. Configure o Nginx como proxy reverso
-
-```nginx
-server {
-    listen 80;
-    server_name seudominio.com.br;
-
-    client_max_body_size 50M;
-
-    location / {
-        proxy_pass http://localhost:5000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
-    }
-}
-```
-
-### 7. Configure o PM2 para manter o servidor rodando
-
-```bash
-npm install -g pm2
-
-# Inicie o servidor com PM2
-pm2 start dist/index.cjs --name shift-agency --env production
-
-# Configure auto-restart no boot
-pm2 startup
-pm2 save
-```
-
-### 8. Configure SSL com Certbot (HTTPS)
-
-```bash
-sudo apt install certbot python3-certbot-nginx
-sudo certbot --nginx -d seudominio.com.br
-```
-
-## Estrutura de Arquivos no Servidor
+## Estrutura no Servidor
 
 ```
-/var/www/shift-agency/
+/var/www/kanbou/
 ├── dist/
-│   ├── public/          # Frontend compilado
-│   └── index.cjs        # Backend compilado
+│   ├── public/              # Frontend compilado
+│   └── index.cjs            # Backend compilado
 ├── uploads/
-│   ├── public/          # Uploads públicos
-│   └── private/         # Uploads privados (logos, briefings)
+│   ├── public/              # Uploads públicos
+│   └── private/             # Uploads privados
 ├── server/
-│   └── thumbnails/      # Thumbnails de imagens do Kanban
-├── .env                 # Variáveis de ambiente
-├── node_modules/
+│   └── thumbnails/          # Thumbnails do Kanban
+├── nginx/
+│   └── kanbou.conf          # Config do Nginx
+├── scripts/
+│   ├── setup-server.sh      # Script de instalação
+│   ├── update.sh            # Script de atualização
+│   └── backup.sh            # Script de backup
+├── ecosystem.config.js      # Config do PM2
+├── .env                     # Variáveis de ambiente
 └── package.json
 ```
 
-## Pastas Importantes
+---
 
-- **uploads/**: Criada automaticamente. Contém arquivos enviados pelos usuários (logos, imagens de briefings). Faça backup regularmente.
-- **server/thumbnails/**: Criada automaticamente. Contém thumbnails gerados para o Kanban.
+## Comandos Úteis
 
-## Backup
+```bash
+# Ver status do app
+pm2 status
 
-Recomenda-se fazer backup regular de:
-1. **Banco de dados**: `pg_dump shift_agency > backup_$(date +%Y%m%d).sql`
-2. **Pasta uploads/**: Contém todos os arquivos enviados
-3. **Pasta server/thumbnails/**: Thumbnails podem ser regenerados, mas o backup evita reprocessamento
-4. **Arquivo .env**: Suas configurações e credenciais
+# Ver logs em tempo real
+pm2 logs kanbou
+
+# Reiniciar app
+pm2 restart kanbou
+
+# Parar app
+pm2 stop kanbou
+
+# Ver uso de memória/CPU
+pm2 monit
+```
+
+---
 
 ## Atualização
 
-Para atualizar o sistema:
+Para atualizar o sistema quando houver novas versões:
 
 ```bash
-cd /var/www/shift-agency
-git pull
+cd /var/www/kanbou
+bash scripts/update.sh
+```
+
+Ou manualmente:
+
+```bash
+cd /var/www/kanbou
+git pull origin main
 npm install
 npm run db:push
 npm run build
-pm2 restart shift-agency
+pm2 restart kanbou
 ```
+
+---
+
+## Backup
+
+### Backup manual:
+
+```bash
+bash /var/www/kanbou/scripts/backup.sh
+```
+
+### Backup automático (diário às 3h da manhã):
+
+```bash
+crontab -e
+# Adicione a linha:
+0 3 * * * /bin/bash /var/www/kanbou/scripts/backup.sh >> /var/log/kanbou/backup.log 2>&1
+```
+
+### Restaurar backup do banco:
+
+```bash
+psql DATABASE_URL < /var/backups/kanbou/db_XXXXXXXX.sql
+```
+
+---
 
 ## Solução de Problemas
 
-### Erro de conexão com o banco
-- Verifique se o PostgreSQL está rodando: `sudo systemctl status postgresql`
-- Verifique a DATABASE_URL no `.env`
+### App não inicia
+```bash
+pm2 logs kanbou --lines 50
+# Verifique se .env existe e está correto
+cat /var/www/kanbou/.env
+```
+
+### Erro de conexão com banco
+```bash
+systemctl status postgresql
+# Verifique a DATABASE_URL no .env
+```
+
+### Erro 502 Bad Gateway
+```bash
+# App não está rodando
+pm2 status
+pm2 restart kanbou
+# Ou o Nginx não está apontando para a porta certa
+nginx -t
+systemctl reload nginx
+```
 
 ### Erro do Google Drive
 - Verifique se as credenciais estão corretas no `.env`
-- O Refresh Token pode expirar se o app estiver em modo "teste" no Google Cloud Console. Publique o app para tokens permanentes.
+- O Refresh Token pode expirar se o app estiver em modo "teste" no Google Cloud Console
+- Publique o app para tokens permanentes
 
 ### Upload de arquivos falha
-- Verifique a configuração `client_max_body_size` no Nginx (deve ser >= 50M)
-- Verifique permissões da pasta `uploads/`: `chmod -R 755 uploads/`
+```bash
+# Verifique permissões
+chmod -R 755 /var/www/kanbou/uploads
+# Verifique tamanho máximo no Nginx (deve ser >= 50M)
+grep client_max_body_size /etc/nginx/sites-available/kanbou
+```
 
-### Servidor não inicia
-- Verifique os logs: `pm2 logs shift-agency`
-- Verifique se a porta não está em uso: `lsof -i :5000`
+### Renovar SSL manualmente
+```bash
+certbot renew
+# O Certbot configura renovação automática, mas caso precise forçar
+```
+
+### Limpar logs antigos
+```bash
+pm2 flush kanbou
+```
