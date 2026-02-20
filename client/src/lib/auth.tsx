@@ -18,7 +18,6 @@ type AuthContextType = {
   user: User | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  quickLogin: (userId: number) => Promise<void>;
   logout: () => Promise<void>;
 };
 
@@ -55,23 +54,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  const quickLoginMutation = useMutation({
-    mutationFn: async (userId: number) => {
-      const res = await apiRequest("POST", "/api/auth/quick-login", { userId });
-      return res.json();
-    },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-      await queryClient.refetchQueries({ queryKey: ["/api/auth/me"] });
-    },
-  });
-
   const login = async (email: string, password: string) => {
     await loginMutation.mutateAsync({ email, password });
-  };
-
-  const quickLogin = async (userId: number) => {
-    await quickLoginMutation.mutateAsync(userId);
   };
 
   const logout = async () => {
@@ -79,7 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user: user ?? null, isLoading, login, quickLogin, logout }}>
+    <AuthContext.Provider value={{ user: user ?? null, isLoading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

@@ -17,6 +17,61 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 
 const THUMBNAILS_DIR = path.join(process.cwd(), "server", "thumbnails");
 if (!fs.existsSync(THUMBNAILS_DIR)) fs.mkdirSync(THUMBNAILS_DIR, { recursive: true });
 
+const loginAttempts = new Map<string, { count: number; firstAttempt: number; blockedUntil: number }>();
+const MAX_LOGIN_ATTEMPTS = 5;
+const WINDOW_MS = 15 * 60 * 1000;
+const BLOCK_DURATION_MS = 15 * 60 * 1000;
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, data] of loginAttempts.entries()) {
+    if (now - data.firstAttempt > WINDOW_MS && now > data.blockedUntil) {
+      loginAttempts.delete(key);
+    }
+  }
+}, 60 * 1000);
+
+function getClientIp(req: any): string {
+  return req.ip || req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.connection?.remoteAddress || "unknown";
+}
+
+function checkLoginRateLimit(ip: string): { allowed: boolean; retryAfter?: number } {
+  const now = Date.now();
+  const data = loginAttempts.get(ip);
+
+  if (!data) return { allowed: true };
+
+  if (now < data.blockedUntil) {
+    return { allowed: false, retryAfter: Math.ceil((data.blockedUntil - now) / 1000) };
+  }
+
+  if (now - data.firstAttempt > WINDOW_MS) {
+    loginAttempts.delete(ip);
+    return { allowed: true };
+  }
+
+  if (data.count >= MAX_LOGIN_ATTEMPTS) {
+    data.blockedUntil = now + BLOCK_DURATION_MS;
+    return { allowed: false, retryAfter: Math.ceil(BLOCK_DURATION_MS / 1000) };
+  }
+
+  return { allowed: true };
+}
+
+function recordFailedLogin(ip: string) {
+  const now = Date.now();
+  const data = loginAttempts.get(ip);
+  if (!data) {
+    loginAttempts.set(ip, { count: 1, firstAttempt: now, blockedUntil: 0 });
+  } else {
+    data.count++;
+  }
+}
+
+function clearLoginAttempts(ip: string) {
+  loginAttempts.delete(ip);
+}
+
 async function generateThumbnail(buffer: Buffer, attachmentId: string, width = 300, height = 300): Promise<string | null> {
   try {
     const thumbPath = path.join(THUMBNAILS_DIR, `${attachmentId}.webp`);
@@ -66,18 +121,31 @@ export async function registerRoutes(
 
   app.post("/api/auth/login", async (req, res) => {
     try {
+      const ip = getClientIp(req);
+      const rateCheck = checkLoginRateLimit(ip);
+      if (!rateCheck.allowed) {
+        res.setHeader("Retry-After", String(rateCheck.retryAfter || 900));
+        return res.status(429).json({
+          message: `Muitas tentativas de login. Tente novamente em ${Math.ceil((rateCheck.retryAfter || 900) / 60)} minutos.`
+        });
+      }
+
       const input = loginSchema.parse(req.body);
       const user = await storage.getUserByEmail(input.email);
       if (!user) {
+        recordFailedLogin(ip);
         return res.status(401).json({ message: "Email ou senha inválidos" });
       }
       if (!user.isActive) {
+        recordFailedLogin(ip);
         return res.status(401).json({ message: "Conta desativada" });
       }
       const valid = await verifyPassword(input.password, user.password);
       if (!valid) {
+        recordFailedLogin(ip);
         return res.status(401).json({ message: "Email ou senha inválidos" });
       }
+      clearLoginAttempts(ip);
       (req as any).session.userId = user.id;
       const { password: _, ...safeUser } = user;
       res.json(safeUser);
@@ -104,34 +172,6 @@ export async function registerRoutes(
     if (!user) {
       return res.status(401).json({ message: "Não autenticado" });
     }
-    const { password: _, ...safeUser } = user;
-    res.json(safeUser);
-  });
-
-  app.get("/api/auth/quick-accounts", async (_req, res) => {
-    const allUsers = await storage.getUsers();
-    const allClients = await storage.getClients();
-    const clientMap = new Map(allClients.map(c => [c.id, c.name]));
-    const accounts = allUsers
-      .filter((u) => u.isActive)
-      .map((u) => ({
-        id: u.id,
-        name: u.name,
-        email: u.email,
-        role: u.role,
-        clientName: u.clientId ? clientMap.get(u.clientId) || null : null,
-      }));
-    res.json(accounts);
-  });
-
-  app.post("/api/auth/quick-login", async (req, res) => {
-    const { userId } = req.body;
-    if (!userId) return res.status(400).json({ message: "userId requerido" });
-    const user = await storage.getUser(Number(userId));
-    if (!user || !user.isActive) {
-      return res.status(404).json({ message: "Usuário não encontrado" });
-    }
-    (req as any).session.userId = user.id;
     const { password: _, ...safeUser } = user;
     res.json(safeUser);
   });

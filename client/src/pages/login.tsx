@@ -1,66 +1,20 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Shield, User, Palette } from "lucide-react";
-
-interface QuickAccount {
-  id: number;
-  name: string;
-  email: string;
-  role: string;
-  clientName?: string | null;
-}
-
-const ROLE_ICONS: Record<string, typeof Shield> = {
-  admin: Shield,
-  designer: Palette,
-  client: User,
-};
-
-const ROLE_LABELS: Record<string, string> = {
-  admin: "Admin",
-  designer: "Designer",
-  client: "Cliente",
-};
+import { Loader2 } from "lucide-react";
 
 export default function LoginPage() {
-  const { login, quickLogin } = useAuth();
+  const { login } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [quickLoading, setQuickLoading] = useState<number | null>(null);
-  const [quickAccounts, setQuickAccounts] = useState<QuickAccount[]>([]);
-
-  useEffect(() => {
-    fetch("/api/auth/quick-accounts")
-      .then((r) => r.json())
-      .then((data) => setQuickAccounts(data))
-      .catch(() => {});
-  }, []);
-
-  const handleQuickLogin = async (userId: number) => {
-    setQuickLoading(userId);
-    try {
-      await quickLogin(userId);
-      setLocation("/");
-    } catch (err: any) {
-      toast({
-        title: "Erro",
-        description: "Falha no acesso rápido",
-        variant: "destructive",
-      });
-    } finally {
-      setQuickLoading(null);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,10 +54,10 @@ export default function LoginPage() {
           </div>
           <div className="space-y-4">
             <h1 className="font-display text-4xl font-bold leading-tight" style={{ color: 'hsl(0 0% 92%)' }}>
-              Gerencie suas redes sociais em um só lugar
+              Gerencie suas redes sociais em um so lugar
             </h1>
             <p className="text-lg leading-relaxed" style={{ color: 'hsl(0 0% 50%)' }}>
-              Agende posts, aprove conteúdos e acompanhe métricas de todos os seus clientes.
+              Agende posts, aprove conteudos e acompanhe metricas de todos os seus clientes.
             </p>
           </div>
           <div className="flex gap-4">
@@ -122,7 +76,7 @@ export default function LoginPage() {
               ))}
             </div>
             <p className="text-sm self-center" style={{ color: 'hsl(0 0% 50%)' }}>
-              Usado por agências em todo o Brasil
+              Usado por agencias em todo o Brasil
             </p>
           </div>
         </div>
@@ -160,6 +114,7 @@ export default function LoginPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
+                    autoComplete="email"
                     className="h-11"
                     data-testid="input-email"
                   />
@@ -173,6 +128,8 @@ export default function LoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
+                    autoComplete="current-password"
+                    minLength={6}
                     className="h-11"
                     data-testid="input-password"
                   />
@@ -191,50 +148,6 @@ export default function LoginPage() {
               </form>
             </CardContent>
           </Card>
-
-          {quickAccounts.length > 0 && (
-            <div className="space-y-3">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">Acesso Rápido</span>
-                </div>
-              </div>
-              <div className="grid gap-2">
-                {quickAccounts.map((account) => {
-                  const Icon = ROLE_ICONS[account.role] || User;
-                  const roleLabel = ROLE_LABELS[account.role] || account.role;
-                  return (
-                    <Button
-                      key={account.id}
-                      variant="outline"
-                      className="w-full justify-start gap-3"
-                      disabled={quickLoading === account.id}
-                      onClick={() => handleQuickLogin(account.id)}
-                      data-testid={`button-quick-login-${account.id}`}
-                    >
-                      {quickLoading === account.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Icon className="w-4 h-4" />
-                      )}
-                      <span className="flex-1 text-left truncate">
-                        {account.name}
-                        {account.clientName && (
-                          <span className="text-muted-foreground text-xs ml-1">({account.clientName})</span>
-                        )}
-                      </span>
-                      <Badge variant="secondary" className="text-[10px] no-default-hover-elevate no-default-active-elevate">
-                        {roleLabel}
-                      </Badge>
-                    </Button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>
