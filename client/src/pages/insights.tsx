@@ -141,8 +141,18 @@ export default function InsightsPage() {
 
   return (
     <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-6">
-      <div className="rounded-xl bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-yellow-500/10 dark:from-amber-500/15 dark:via-orange-500/10 dark:to-yellow-500/5 p-6">
-        <div className="flex items-center gap-4 mb-4">
+      <div className="relative rounded-xl bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-yellow-500/10 dark:from-amber-500/15 dark:via-orange-500/10 dark:to-yellow-500/5 p-6 overflow-hidden">
+        <svg className="absolute bottom-0 left-0 w-full pointer-events-none" viewBox="0 0 1200 120" preserveAspectRatio="none" style={{ height: '60px' }}>
+          <path className="insights-wave insights-wave-1" d="M0,60 C150,100 350,0 500,50 C650,100 850,20 1000,60 C1100,80 1150,40 1200,60 L1200,120 L0,120 Z" fill="currentColor" style={{ color: 'hsl(var(--primary) / 0.06)' }} />
+          <path className="insights-wave insights-wave-2" d="M0,80 C200,40 400,100 600,60 C800,20 1000,80 1200,50 L1200,120 L0,120 Z" fill="currentColor" style={{ color: 'hsl(var(--primary) / 0.04)' }} />
+          <path className="insights-wave insights-wave-3" d="M0,90 C100,70 300,110 500,80 C700,50 900,100 1200,70 L1200,120 L0,120 Z" fill="currentColor" style={{ color: 'hsl(var(--primary) / 0.03)' }} />
+        </svg>
+
+        <div className="absolute top-3 right-4 opacity-[0.04] pointer-events-none">
+          <Lightbulb className="w-24 h-24" />
+        </div>
+
+        <div className="relative z-10 flex items-center gap-4 mb-4">
           <div className="w-11 h-11 rounded-2xl bg-amber-500/20 dark:bg-amber-500/30 flex items-center justify-center shrink-0">
             <Lightbulb className="w-5 h-5 text-amber-500" />
           </div>
@@ -157,7 +167,7 @@ export default function InsightsPage() {
         </div>
 
         {!isClient && (
-          <div className="flex items-center gap-3 flex-wrap">
+          <div className="relative z-10 flex items-center gap-3 flex-wrap">
             <div className="flex items-center gap-2 flex-1 min-w-[200px] max-w-[280px]">
               <Filter className="w-4 h-4 text-muted-foreground shrink-0" />
               <Select value={selectedClientId} onValueChange={setSelectedClientId}>
@@ -186,14 +196,16 @@ export default function InsightsPage() {
         )}
 
         {isClient && (
-          <Button
-            onClick={() => setShowComposer(true)}
-            disabled={showComposer}
-            data-testid="button-new-insight"
-          >
-            <PenLine className="w-4 h-4 mr-2" />
-            Novo Insight
-          </Button>
+          <div className="relative z-10">
+            <Button
+              onClick={() => setShowComposer(true)}
+              disabled={showComposer}
+              data-testid="button-new-insight"
+            >
+              <PenLine className="w-4 h-4 mr-2" />
+              Novo Insight
+            </Button>
+          </div>
         )}
       </div>
 

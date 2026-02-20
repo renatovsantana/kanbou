@@ -413,3 +413,42 @@
     padding: 0 !important;
   }
 }
+
+/* Insights wave animations */
+@keyframes insights-wave-drift {
+  0% { transform: translateX(0); }
+  50% { transform: translateX(-25px); }
+  100% { transform: translateX(0); }
+}
+
+@keyframes insights-wave-drift-reverse {
+  0% { transform: translateX(0); }
+  50% { transform: translateX(20px); }
+  100% { transform: translateX(0); }
+}
+
+@keyframes insights-wave-drift-slow {
+  0% { transform: translateX(0); }
+  50% { transform: translateX(-15px); }
+  100% { transform: translateX(0); }
+}
+
+.insights-wave-1 {
+  animation: insights-wave-drift 6s ease-in-out infinite;
+}
+
+.insights-wave-2 {
+  animation: insights-wave-drift-reverse 8s ease-in-out infinite;
+}
+
+.insights-wave-3 {
+  animation: insights-wave-drift-slow 10s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .insights-wave-1,
+  .insights-wave-2,
+  .insights-wave-3 {
+    animation: none;
+  }
+}
