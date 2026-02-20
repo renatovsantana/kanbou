@@ -244,7 +244,8 @@ crontab -e
 ### Restaurar backup do banco:
 
 ```bash
-psql DATABASE_URL < /var/backups/kanbou/db_XXXXXXXX.sql
+source /var/www/kanbou/.env
+psql --dbname="$DATABASE_URL" < /var/backups/kanbou/db_XXXXXXXX.sql
 ```
 
 ---
