@@ -59,6 +59,7 @@ import {
   Check,
   Sun,
   Moon,
+  Pencil,
 } from "lucide-react";
 import { SiInstagram, SiFacebook, SiTiktok, SiLinkedin, SiYoutube } from "react-icons/si";
 import { format } from "date-fns";
@@ -208,7 +209,7 @@ export default function ClientOnboarding() {
             <CredentialsSection clientId={clientId} credentials={credentials} />
             <BrandIdentitySection clientId={clientId} />
             <InsightsSection clientId={clientId} insights={insights} />
-            <CompetitorsSection competitors={clientCompetitors} />
+            <CompetitorsSection clientId={clientId} competitors={clientCompetitors} />
             {user?.role === "admin" && (
               <AccessSection clientId={clientId} users={users} accessUserIds={accessUserIds} />
             )}
@@ -962,54 +963,213 @@ function InsightsSection({ clientId, insights }: { clientId: number; insights: C
   );
 }
 
-function CompetitorsSection({ competitors }: { competitors: Competitor[] }) {
+function CompetitorsSection({ clientId, competitors }: { clientId: number; competitors: Competitor[] }) {
+  const { toast } = useToast();
+  const { user } = useAuth();
+  const isEditor = user?.role === "admin" || user?.role === "designer";
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<Competitor | null>(null);
+  const [competitorToDelete, setCompetitorToDelete] = useState<number | null>(null);
+  const [form, setForm] = useState({ name: "", instagram: "", facebook: "", tiktok: "", linkedin: "", youtube: "", website: "", notes: "" });
+
+  const resetForm = () => {
+    setForm({ name: "", instagram: "", facebook: "", tiktok: "", linkedin: "", youtube: "", website: "", notes: "" });
+    setEditing(null);
+    setShowForm(false);
+  };
+
+  const startEdit = (comp: Competitor) => {
+    setForm({
+      name: comp.name || "",
+      instagram: comp.instagram || "",
+      facebook: comp.facebook || "",
+      tiktok: comp.tiktok || "",
+      linkedin: comp.linkedin || "",
+      youtube: comp.youtube || "",
+      website: comp.website || "",
+      notes: comp.notes || "",
+    });
+    setEditing(comp);
+    setShowForm(true);
+  };
+
+  const handleSave = async () => {
+    if (!form.name.trim()) {
+      toast({ title: "Nome é obrigatório", variant: "destructive" });
+      return;
+    }
+    try {
+      if (editing) {
+        await apiRequest("PUT", `/api/competitors/${editing.id}`, form);
+        toast({ title: "Concorrente atualizado" });
+      } else {
+        await apiRequest("POST", "/api/competitors", { ...form, clientId });
+        toast({ title: "Concorrente cadastrado" });
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/competitors"] });
+      resetForm();
+    } catch {
+      toast({ title: "Erro ao salvar concorrente", variant: "destructive" });
+    }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (competitorToDelete === null) return;
+    try {
+      await apiRequest("DELETE", `/api/competitors/${competitorToDelete}`);
+      queryClient.invalidateQueries({ queryKey: ["/api/competitors"] });
+      toast({ title: "Concorrente removido" });
+    } catch {
+      toast({ title: "Erro ao remover concorrente", variant: "destructive" });
+    }
+    setCompetitorToDelete(null);
+  };
+
   return (
     <Card className="p-5" data-testid="section-competitors">
-      <div className="flex items-center gap-2 mb-3">
-        <Building2 className="w-4 h-4 text-primary" />
-        <h2 className="font-semibold">Concorrentes</h2>
-        <Badge variant="secondary" className="text-xs no-default-hover-elevate no-default-active-elevate">{competitors.length}</Badge>
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <div className="flex items-center gap-2">
+          <Building2 className="w-4 h-4 text-primary" />
+          <h2 className="font-semibold">Concorrentes</h2>
+          <Badge variant="secondary" className="text-xs no-default-hover-elevate no-default-active-elevate">{competitors.length}</Badge>
+        </div>
+        {isEditor && !showForm && (
+          <Button variant="outline" size="sm" onClick={() => setShowForm(true)} data-testid="button-add-competitor">
+            <Plus className="w-3.5 h-3.5 mr-1" /> Adicionar
+          </Button>
+        )}
       </div>
 
+      {showForm && (
+        <div className="p-3 rounded-md bg-muted/30 mb-3 space-y-2" data-testid="competitor-form">
+          <Input
+            placeholder="Nome do concorrente *"
+            value={form.name}
+            onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+            data-testid="input-competitor-name"
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <div className="relative">
+              <SiInstagram className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+              <Input className="pl-8" placeholder="Instagram" value={form.instagram} onChange={e => setForm(f => ({ ...f, instagram: e.target.value }))} data-testid="input-competitor-instagram" />
+            </div>
+            <div className="relative">
+              <SiFacebook className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+              <Input className="pl-8" placeholder="Facebook" value={form.facebook} onChange={e => setForm(f => ({ ...f, facebook: e.target.value }))} data-testid="input-competitor-facebook" />
+            </div>
+            <div className="relative">
+              <SiTiktok className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+              <Input className="pl-8" placeholder="TikTok" value={form.tiktok} onChange={e => setForm(f => ({ ...f, tiktok: e.target.value }))} data-testid="input-competitor-tiktok" />
+            </div>
+            <div className="relative">
+              <SiLinkedin className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+              <Input className="pl-8" placeholder="LinkedIn" value={form.linkedin} onChange={e => setForm(f => ({ ...f, linkedin: e.target.value }))} data-testid="input-competitor-linkedin" />
+            </div>
+            <div className="relative">
+              <SiYoutube className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+              <Input className="pl-8" placeholder="YouTube" value={form.youtube} onChange={e => setForm(f => ({ ...f, youtube: e.target.value }))} data-testid="input-competitor-youtube" />
+            </div>
+            <div className="relative">
+              <Globe className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+              <Input className="pl-8" placeholder="Website" value={form.website} onChange={e => setForm(f => ({ ...f, website: e.target.value }))} data-testid="input-competitor-website" />
+            </div>
+          </div>
+          <Textarea
+            placeholder="Observações (opcional)"
+            value={form.notes}
+            onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+            className="resize-none text-sm"
+            rows={2}
+            data-testid="input-competitor-notes"
+          />
+          <div className="flex gap-2 justify-end">
+            <Button variant="ghost" size="sm" onClick={resetForm} data-testid="button-cancel-competitor">Cancelar</Button>
+            <Button size="sm" onClick={handleSave} data-testid="button-save-competitor">
+              <Save className="w-3.5 h-3.5 mr-1" /> {editing ? "Atualizar" : "Salvar"}
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-2">
-        {competitors.length === 0 ? (
+        {competitors.length === 0 && !showForm ? (
           <p className="text-sm text-muted-foreground">Nenhum concorrente cadastrado.</p>
         ) : (
           competitors.map(comp => (
-            <div key={comp.id} className="p-2.5 rounded-md bg-muted/20" data-testid={`competitor-${comp.id}`}>
-              <p className="text-sm font-medium">{comp.name}</p>
-              <div className="flex items-center gap-3 mt-1 flex-wrap">
-                {comp.instagram && (
-                  <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                    <SiInstagram className="w-3 h-3" /> {comp.instagram}
-                  </span>
-                )}
-                {comp.facebook && (
-                  <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                    <SiFacebook className="w-3 h-3" /> {comp.facebook}
-                  </span>
-                )}
-                {comp.tiktok && (
-                  <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                    <SiTiktok className="w-3 h-3" /> {comp.tiktok}
-                  </span>
-                )}
-                {comp.linkedin && (
-                  <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                    <SiLinkedin className="w-3 h-3" /> {comp.linkedin}
-                  </span>
-                )}
-                {comp.youtube && (
-                  <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                    <SiYoutube className="w-3 h-3" /> {comp.youtube}
-                  </span>
+            <div key={comp.id} className="p-2.5 rounded-md bg-muted/20 group" data-testid={`competitor-${comp.id}`}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium">{comp.name}</p>
+                  <div className="flex items-center gap-3 mt-1 flex-wrap">
+                    {comp.instagram && (
+                      <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                        <SiInstagram className="w-3 h-3" /> {comp.instagram}
+                      </span>
+                    )}
+                    {comp.facebook && (
+                      <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                        <SiFacebook className="w-3 h-3" /> {comp.facebook}
+                      </span>
+                    )}
+                    {comp.tiktok && (
+                      <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                        <SiTiktok className="w-3 h-3" /> {comp.tiktok}
+                      </span>
+                    )}
+                    {comp.linkedin && (
+                      <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                        <SiLinkedin className="w-3 h-3" /> {comp.linkedin}
+                      </span>
+                    )}
+                    {comp.youtube && (
+                      <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                        <SiYoutube className="w-3 h-3" /> {comp.youtube}
+                      </span>
+                    )}
+                    {comp.website && (
+                      <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                        <Globe className="w-3 h-3" /> {comp.website}
+                      </span>
+                    )}
+                  </div>
+                  {comp.notes && <p className="text-[10px] text-muted-foreground/60 mt-1">{comp.notes}</p>}
+                </div>
+                {isEditor && (
+                  <div className="flex items-center gap-0.5 invisible group-hover:visible">
+                    <Button variant="ghost" size="icon" onClick={() => startEdit(comp)} data-testid={`button-edit-competitor-${comp.id}`} title="Editar">
+                      <Pencil className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => setCompetitorToDelete(comp.id)} data-testid={`button-delete-competitor-${comp.id}`} title="Remover">
+                      <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                    </Button>
+                  </div>
                 )}
               </div>
-              {comp.notes && <p className="text-[10px] text-muted-foreground/60 mt-1">{comp.notes}</p>}
             </div>
           ))
         )}
       </div>
+
+      <AlertDialog open={competitorToDelete !== null} onOpenChange={(open) => !open && setCompetitorToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover concorrente</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja remover este concorrente? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-competitor">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="button-confirm-delete-competitor"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleDeleteConfirm}
+            >
+              Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
