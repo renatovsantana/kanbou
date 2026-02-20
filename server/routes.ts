@@ -2551,28 +2551,32 @@ export async function registerRoutes(
     const message = z.string().min(1).parse(req.body.message);
     const insight = await storage.createClientInsight({ clientId, userId: user.id, message });
     const client = await storage.getClient(clientId);
-    await storage.createNotification({
-      clientId,
-      type: "insight",
-      message: `${user.name} postou um insight${client ? ` em ${client.name}` : ""}: "${message.substring(0, 60)}..."`,
-      recipientRole: user.role === "client" ? "admin" : "client",
-      isRead: false,
-    });
+    const notifMsg = `${user.name} postou um insight${client ? ` em ${client.name}` : ""}: "${message.substring(0, 60)}..."`;
+    if (user.role === "client") {
+      await storage.createNotification({ clientId, type: "insight", message: notifMsg, recipientRole: "admin", isRead: false });
+      await storage.createNotification({ clientId, type: "insight", message: notifMsg, recipientRole: "designer", isRead: false });
+    } else {
+      await storage.createNotification({ clientId, type: "insight", message: notifMsg, recipientRole: "client", isRead: false });
+    }
     res.json({ ...insight, userName: user.name });
   });
   app.delete("/api/onboarding/insights/:id", requireAuth, async (req, res) => {
     const user = await getCurrentUser(req);
     if (!user) return res.status(401).json({ message: "Não autenticado" });
     const insightId = Number(req.params.id);
-    if (user.role === "client") {
-      const allInsights = user.clientId ? await storage.getClientInsights(user.clientId) : [];
+    if (user.role === "admin" || user.role === "designer") {
+      await storage.deleteClientInsight(insightId);
+      return res.json({ success: true });
+    }
+    if (user.role === "client" && user.clientId) {
+      const allInsights = await storage.getClientInsights(user.clientId);
       const insight = allInsights.find(i => i.id === insightId);
-      if (!insight || insight.userId !== user.id) {
-        return res.status(403).json({ message: "Você só pode apagar seus próprios insights" });
+      if (insight && insight.userId === user.id) {
+        await storage.deleteClientInsight(insightId);
+        return res.json({ success: true });
       }
     }
-    await storage.deleteClientInsight(insightId);
-    res.json({ success: true });
+    return res.status(403).json({ message: "Sem permissão para apagar este insight" });
   });
 
   app.get("/api/onboarding/:clientId/access", requireAuth, requireRole(["admin"]), async (req, res) => {
