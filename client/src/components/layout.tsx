@@ -252,6 +252,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   const kanbanNotifTypes = ["approval_sent", "card_approved", "card_rejected", "revision_requested", "comment_added", "card_scheduled"];
   const kanbanUnread = unreadNotifications.filter(n => kanbanNotifTypes.includes(n.type));
+  const insightUnread = unreadNotifications.filter(n => n.type === "insight");
 
   const kanbanNotifByClient = useMemo(() => {
     const map: Record<number, number> = {};
@@ -262,6 +263,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
     }
     return map;
   }, [kanbanUnread]);
+
+  const insightNotifByClient = useMemo(() => {
+    const map: Record<number, number> = {};
+    for (const n of insightUnread) {
+      if (n.clientId) {
+        map[n.clientId] = (map[n.clientId] || 0) + 1;
+      }
+    }
+    return map;
+  }, [insightUnread]);
+
+  const totalInsightUnread = insightUnread.length;
 
 
   const [errorReportOpen, setErrorReportOpen] = useState(false);
@@ -390,7 +403,30 @@ export function Layout({ children }: { children: React.ReactNode }) {
     const showClientTree = role === "admin" || role === "designer";
 
     if (!showClientTree) {
-      return <NavSection label="Insights" items={[{ name: "Insights", href: "/insights", icon: Lightbulb }]} />;
+      return (
+        <div className="mb-5">
+          <p className="px-3 text-[10px] font-semibold uppercase tracking-[0.15em] mb-2" style={{ color: 'hsl(var(--sidebar-fg) / 0.3)' }}>
+            Insights
+          </p>
+          <div className="space-y-0.5">
+            <Link href="/insights">
+              <div
+                className={`sidebar-link ${isInsightsActive ? "active" : ""}`}
+                data-testid="nav-insights"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <Lightbulb className="w-[18px] h-[18px] sidebar-link-icon" />
+                Insights
+                {totalInsightUnread > 0 && (
+                  <span className="ml-auto min-w-[18px] h-[18px] rounded-full text-[10px] font-bold flex items-center justify-center shrink-0" style={{ background: 'hsl(var(--sidebar-accent))', color: 'hsl(0 0% 10%)' }}>
+                    {totalInsightUnread > 9 ? "9+" : totalInsightUnread}
+                  </span>
+                )}
+              </div>
+            </Link>
+          </div>
+        </div>
+      );
     }
 
     return (
@@ -407,6 +443,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
             >
               <Lightbulb className="w-[18px] h-[18px] sidebar-link-icon" />
               Insights
+              {totalInsightUnread > 0 && (
+                <span className="min-w-[18px] h-[18px] rounded-full text-[10px] font-bold flex items-center justify-center shrink-0" style={{ background: 'hsl(var(--sidebar-accent))', color: 'hsl(0 0% 10%)' }}>
+                  {totalInsightUnread > 9 ? "9+" : totalInsightUnread}
+                </span>
+              )}
               <button
                 className="ml-auto"
                 onClick={(e) => {
@@ -438,6 +479,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   </div>
                 )}
                 <span className="text-xs truncate flex-1">{client.name}</span>
+                {(insightNotifByClient[client.id] || 0) > 0 && (
+                  <span className="min-w-[18px] h-[18px] rounded-full text-[10px] font-bold flex items-center justify-center shrink-0" style={{ background: 'hsl(var(--sidebar-accent))', color: 'hsl(0 0% 10%)' }}>
+                    {insightNotifByClient[client.id] > 9 ? "9+" : insightNotifByClient[client.id]}
+                  </span>
+                )}
               </div>
             </Link>
           ))}

@@ -2560,8 +2560,18 @@ export async function registerRoutes(
     });
     res.json({ ...insight, userName: user.name });
   });
-  app.delete("/api/onboarding/insights/:id", requireAuth, requireRole(["admin", "designer"]), async (req, res) => {
-    await storage.deleteClientInsight(Number(req.params.id));
+  app.delete("/api/onboarding/insights/:id", requireAuth, async (req, res) => {
+    const user = await getCurrentUser(req);
+    if (!user) return res.status(401).json({ message: "Não autenticado" });
+    const insightId = Number(req.params.id);
+    if (user.role === "client") {
+      const allInsights = user.clientId ? await storage.getClientInsights(user.clientId) : [];
+      const insight = allInsights.find(i => i.id === insightId);
+      if (!insight || insight.userId !== user.id) {
+        return res.status(403).json({ message: "Você só pode apagar seus próprios insights" });
+      }
+    }
+    await storage.deleteClientInsight(insightId);
     res.json({ success: true });
   });
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -64,6 +64,12 @@ export default function InsightsPage() {
   const [showComposer, setShowComposer] = useState(false);
   const [confirmPublish, setConfirmPublish] = useState(false);
 
+  useEffect(() => {
+    if (urlClientId && urlClientId !== selectedClientId) {
+      setSelectedClientId(urlClientId);
+    }
+  }, [urlClientId]);
+
   const { data: clients = [] } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
   });
@@ -83,6 +89,8 @@ export default function InsightsPage() {
       apiRequest("POST", `/api/onboarding/${data.clientId}/insights`, { message: data.message }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/insights/all"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
       setMessage("");
       setShowComposer(false);
       toast({ title: "Insight publicado com sucesso" });
@@ -99,7 +107,6 @@ export default function InsightsPage() {
   });
 
   const canDeleteAll = user?.role === "admin" || user?.role === "designer";
-  const canDeleteOwn = true;
   const postClientId = isClient
     ? (user?.clientId || null)
     : (selectedClientId !== "all" ? Number(selectedClientId) : null);
@@ -127,43 +134,41 @@ export default function InsightsPage() {
 
   return (
     <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-6">
-      <div className="rounded-xl overflow-hidden bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-yellow-500/10 dark:from-amber-500/15 dark:via-orange-500/10 dark:to-yellow-500/5 p-6 md:p-8">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/20 dark:bg-amber-500/30 flex items-center justify-center shrink-0">
-              <Lightbulb className="w-6 h-6 text-amber-500" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold" data-testid="text-insights-title">Insights</h1>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                {isClient
-                  ? "Compartilhe ideias e observações com a agência"
-                  : "Compartilhe ideias e observações com sua equipe"}
-              </p>
-            </div>
+      <div className="rounded-xl bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-yellow-500/10 dark:from-amber-500/15 dark:via-orange-500/10 dark:to-yellow-500/5 p-6">
+        <div className="flex items-center gap-4 mb-4">
+          <div className="w-11 h-11 rounded-2xl bg-amber-500/20 dark:bg-amber-500/30 flex items-center justify-center shrink-0">
+            <Lightbulb className="w-5 h-5 text-amber-500" />
           </div>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl font-bold" data-testid="text-insights-title">Insights</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {isClient
+                ? "Compartilhe ideias e observações com a agência"
+                : "Compartilhe ideias e observações com sua equipe"}
+            </p>
+          </div>
+        </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
-            {!isClient && (
-              <div className="flex items-center gap-2">
-                <Filter className="w-4 h-4 text-muted-foreground" />
-                <Select value={selectedClientId} onValueChange={setSelectedClientId}>
-                  <SelectTrigger className="w-[200px]" data-testid="select-insights-client">
-                    <SelectValue placeholder="Filtrar por cliente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os clientes</SelectItem>
-                    {activeClients.map(c => (
-                      <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {postClientId && !showComposer && (
+        {!isClient && (
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2 flex-1 min-w-[200px] max-w-[280px]">
+              <Filter className="w-4 h-4 text-muted-foreground shrink-0" />
+              <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+                <SelectTrigger data-testid="select-insights-client">
+                  <SelectValue placeholder="Filtrar por cliente" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os clientes</SelectItem>
+                  {activeClients.map(c => (
+                    <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {postClientId && (
               <Button
                 onClick={() => setShowComposer(true)}
+                disabled={showComposer}
                 data-testid="button-new-insight"
               >
                 <PenLine className="w-4 h-4 mr-2" />
@@ -171,7 +176,18 @@ export default function InsightsPage() {
               </Button>
             )}
           </div>
-        </div>
+        )}
+
+        {isClient && (
+          <Button
+            onClick={() => setShowComposer(true)}
+            disabled={showComposer}
+            data-testid="button-new-insight"
+          >
+            <PenLine className="w-4 h-4 mr-2" />
+            Novo Insight
+          </Button>
+        )}
       </div>
 
       {showComposer && postClientId && (
@@ -179,7 +195,7 @@ export default function InsightsPage() {
           <div className="flex items-center gap-2 mb-4">
             <Sparkles className="w-4 h-4 text-amber-500" />
             <span className="text-sm font-semibold">Novo Insight</span>
-            {selectedClientName && (
+            {selectedClientName && !isClient && (
               <Badge variant="secondary" className="text-xs no-default-hover-elevate no-default-active-elevate">
                 {selectedClientName}
               </Badge>
@@ -216,7 +232,7 @@ export default function InsightsPage() {
         </Card>
       )}
 
-      {!postClientId && !isClient && (
+      {!postClientId && !isClient && !showComposer && (
         <Card className="p-5 bg-muted/30 border-dashed">
           <div className="flex items-center gap-3 text-muted-foreground">
             <MessageCircle className="w-5 h-5" />
@@ -284,7 +300,7 @@ export default function InsightsPage() {
                           </div>
                         </div>
                       </div>
-                      {(canDeleteAll || (canDeleteOwn && insight.userId === user?.id)) && (
+                      {(canDeleteAll || insight.userId === user?.id) && (
                         <Button
                           variant="ghost"
                           size="icon"
