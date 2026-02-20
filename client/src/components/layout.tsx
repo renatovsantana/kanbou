@@ -525,7 +525,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <NavSection label="Briefing" items={briefingNav} />
         )}
 
-        <InsightsSection />
+        {(role === "admin" || role === "designer") && (
+          <InsightsSection />
+        )}
 
         {(role === "admin" || role === "designer" || role === "client") && (
           <NavSection label="Onboarding" items={[
