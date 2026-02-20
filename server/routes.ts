@@ -975,6 +975,14 @@ export async function registerRoutes(
     res.json(updated);
   });
 
+  app.put("/api/notifications/read-kanban", requireAuth, async (req, res) => {
+    const user = await getCurrentUser(req);
+    if (!user) return res.status(401).json({ message: "Não autenticado" });
+    const clientId = req.body.clientId ? Number(req.body.clientId) : (user.clientId ?? undefined);
+    await storage.markKanbanNotificationsRead(user.role, clientId);
+    res.json({ success: true });
+  });
+
   app.put("/api/notifications/read-insights", requireAuth, async (req, res) => {
     const user = await getCurrentUser(req);
     if (!user) return res.status(401).json({ message: "Não autenticado" });

@@ -851,6 +851,15 @@ export default function KanbanBoard() {
     }
   }, [initialClientId]);
 
+  useEffect(() => {
+    if (selectedClientId) {
+      apiRequest("PUT", "/api/notifications/read-kanban", { clientId: Number(selectedClientId) }).then(() => {
+        queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
+      }).catch(() => {});
+    }
+  }, [selectedClientId]);
+
   const [activeCard, setActiveCard] = useState<KanbanCard | null>(null);
   const [deletingColumn, setDeletingColumn] = useState<KanbanColumn | null>(null);
   const [addingColumn, setAddingColumn] = useState(false);

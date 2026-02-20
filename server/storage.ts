@@ -111,6 +111,7 @@ export interface IStorage {
   markNotificationRead(id: number): Promise<Notification>;
   markAllNotificationsRead(recipientUserId: number): Promise<void>;
   markInsightNotificationsRead(role: string, clientId?: number): Promise<void>;
+  markKanbanNotificationsRead(role: string, clientId?: number): Promise<void>;
 
   getCompetitors(): Promise<Competitor[]>;
   getCompetitorsByClient(clientId: number): Promise<Competitor[]>;
@@ -393,6 +394,25 @@ export class DatabaseStorage implements IStorage {
     await db.update(notifications)
       .set({ isRead: true })
       .where(eq(notifications.recipientUserId, recipientUserId));
+  }
+
+  async markKanbanNotificationsRead(role: string, clientId?: number): Promise<void> {
+    const kanbanTypes = ["approval_sent", "card_approved", "card_rejected", "revision_requested", "comment_added", "card_scheduled"];
+    const conditions = [
+      eq(notifications.isRead, false),
+    ];
+    if (role === "client" && clientId) {
+      conditions.push(eq(notifications.recipientRole, "client"));
+      conditions.push(eq(notifications.clientId, clientId));
+    } else if (clientId) {
+      conditions.push(eq(notifications.recipientRole, role));
+      conditions.push(eq(notifications.clientId, clientId));
+    } else {
+      conditions.push(eq(notifications.recipientRole, role));
+    }
+    await db.update(notifications)
+      .set({ isRead: true })
+      .where(and(...conditions, sql`${notifications.type} = ANY(${kanbanTypes})`));
   }
 
   async markInsightNotificationsRead(role: string, clientId?: number): Promise<void> {
