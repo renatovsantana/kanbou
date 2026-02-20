@@ -268,6 +268,7 @@ function SortableCard({
           {columnTitle === "Agendamento" && onScheduleCard && (
             <button
               className="w-full mt-2 flex items-center justify-center gap-1.5 text-xs font-semibold py-1.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+              onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
                 onScheduleCard(card);
@@ -1057,7 +1058,7 @@ export default function KanbanBoard() {
     createColumnMutation.mutate({ title: trimmed, position: maxPos });
   };
 
-  const handleConfirmSchedule = async () => {
+  const handleConfirmSchedule = () => {
     if (!scheduleConfirmCard) return;
     const agendadosCol = columns.find(c => c.title === "Agendados");
     if (!agendadosCol) {
@@ -1065,18 +1066,12 @@ export default function KanbanBoard() {
       setScheduleConfirmCard(null);
       return;
     }
-    try {
-      const cardsInTarget = cardsByColumn[agendadosCol.id] || [];
-      const newPos = cardsInTarget.length;
-      await apiRequest("PATCH", `/api/kanban/cards/${scheduleConfirmCard.id}`, {
-        columnId: agendadosCol.id,
-        position: newPos,
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/kanban", clientId, "cards"] });
-      toast({ title: "Agendado!", description: `"${scheduleConfirmCard.title}" foi movido para Agendados.` });
-    } catch (err: any) {
-      toast({ title: "Erro", description: err?.message || "Não foi possível agendar.", variant: "destructive" });
-    }
+    const cardsInTarget = cardsByColumn[agendadosCol.id] || [];
+    moveCardMutation.mutate({
+      cardId: scheduleConfirmCard.id,
+      toColumnId: agendadosCol.id,
+      newPosition: cardsInTarget.length,
+    });
     setScheduleConfirmCard(null);
   };
 
