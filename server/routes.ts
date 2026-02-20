@@ -953,7 +953,6 @@ export async function registerRoutes(
 
       const allPosts = await storage.getPosts();
       const postKanbanIds = new Set(allPosts.filter(p => p.kanbanCardId).map(p => p.kanbanCardId));
-      const postKeys = new Set(allPosts.map(p => `${p.clientId}-${(p.title || "").toLowerCase().trim()}`));
 
       const result: any[] = [];
       for (const { card, columnTitle } of filtered) {
@@ -964,10 +963,6 @@ export async function registerRoutes(
 
         const scheduledDate = templateObj.publishDate || templateObj.deadline;
         if (!scheduledDate) continue;
-
-        const cardTitle = templateObj.postTitle || templateObj.headline || templateObj.materialTitle || card.title;
-        const cardKey = `${card.clientId}-${(cardTitle || "").toLowerCase().trim()}`;
-        if (postKeys.has(cardKey)) continue;
 
         let platforms: string[] = [];
         try {
