@@ -86,14 +86,12 @@ function formatFileSize(bytes: number): string {
 }
 
 const LABEL_COLORS: Record<string, string> = {
-  red: "bg-red-500",
-  blue: "bg-blue-500",
-  green: "bg-green-500",
-  yellow: "bg-yellow-500",
-  purple: "bg-purple-500",
-  orange: "bg-orange-500",
-  pink: "bg-pink-500",
-  cyan: "bg-cyan-500",
+  verde: "bg-emerald-500",
+  amarelo: "bg-yellow-400",
+  laranja: "bg-orange-500",
+  vermelho: "bg-red-500",
+  roxo: "bg-purple-500",
+  azul: "bg-blue-500",
 };
 
 function formatDuration(totalSeconds: number): string {

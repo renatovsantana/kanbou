@@ -2046,6 +2046,7 @@ export async function registerRoutes(
         card = await storage.updateKanbanCard(cardId, {
           approvalStatus: "Pendente",
           approvalNotes: null,
+          approvalSentAt: new Date(),
         });
       }
 
@@ -2130,6 +2131,8 @@ export async function registerRoutes(
     const updated = await storage.updateKanbanCard(cardId, {
       approvalStatus: "Pendente",
       approvalNotes: null,
+      approvalSentAt: new Date(),
+      approvalResolvedAt: null,
     });
 
     const moved = await moveCardToColumn(updated, "Em Aprovação", user?.id);
@@ -2282,6 +2285,7 @@ export async function registerRoutes(
     const updated = await storage.updateKanbanCard(cardId, {
       approvalStatus: "Reprovado",
       approvalNotes: notes || null,
+      approvalResolvedAt: new Date(),
     });
 
     const moved = await moveCardToColumn(updated, "Reprovados", user?.id);
@@ -2325,6 +2329,7 @@ export async function registerRoutes(
     const updated = await storage.updateKanbanCard(cardId, {
       approvalStatus: "Revisão",
       approvalNotes: notes || null,
+      approvalResolvedAt: new Date(),
     });
 
     const moved = await moveCardToColumn(updated, "Revisão", user?.id);
