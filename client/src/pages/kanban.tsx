@@ -88,6 +88,7 @@ import {
   Settings2,
   AlertTriangle,
   CalendarCheck,
+  RefreshCw,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -1173,6 +1174,18 @@ export default function KanbanBoard() {
         </div>
 
         <div className="ml-auto flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              queryClient.invalidateQueries({ queryKey: ["/api/kanban", clientId, "columns"] });
+              queryClient.invalidateQueries({ queryKey: ["/api/kanban", clientId, "cards"] });
+            }}
+            title="Atualizar"
+            data-testid="button-refresh-kanban"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </Button>
           {selectedClient && clientId && <KanbanColumnManager clientId={clientId} columns={columns} />}
           {selectedClient && <KanbanBgSettings client={selectedClient} />}
           <Select

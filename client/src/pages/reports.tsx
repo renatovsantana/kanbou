@@ -5,7 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Clock, Users, BarChart3, ChevronDown, ChevronRight, CheckCircle, XCircle, RotateCcw, Filter, FileText, ArrowRight, MoveRight, Building2, CalendarDays, Send, Eye, Printer } from "lucide-react";
+import { Clock, Users, BarChart3, ChevronDown, ChevronRight, CheckCircle, XCircle, RotateCcw, Filter, FileText, ArrowRight, MoveRight, Building2, CalendarDays, Send, Eye, Printer, RefreshCw } from "lucide-react";
+import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth";
 import { CARD_TYPES, TIMED_COLUMNS, type CardType } from "@shared/schema";
 import type { Client, User } from "@shared/schema";
@@ -262,15 +263,30 @@ export default function ReportsPage() {
                 Acompanhamento de fluxo de trabalho e atividades
               </p>
             </div>
-            <Button
-              variant="outline"
-              onClick={() => window.print()}
-              className="print:hidden"
-              data-testid="button-print-report"
-            >
-              <Printer className="w-4 h-4 mr-2" />
-              Imprimir / PDF
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  queryClient.invalidateQueries({ queryKey: [workflowQueryKey] });
+                  queryClient.invalidateQueries({ queryKey: [movementQueryKey] });
+                  queryClient.invalidateQueries({ queryKey: [activityQueryKey] });
+                }}
+                title="Atualizar"
+                data-testid="button-refresh-reports"
+              >
+                <RefreshCw className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => window.print()}
+                className="print:hidden"
+                data-testid="button-print-report"
+              >
+                <Printer className="w-4 h-4 mr-2" />
+                Imprimir / PDF
+              </Button>
+            </div>
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab}>

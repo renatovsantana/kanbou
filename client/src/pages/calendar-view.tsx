@@ -12,7 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
-import { CalendarDays, Filter, ListFilter, AlertTriangle, Clock, Kanban } from "lucide-react";
+import { CalendarDays, Filter, ListFilter, AlertTriangle, Clock, Kanban, RefreshCw } from "lucide-react";
+import { queryClient } from "@/lib/queryClient";
 import type { Client } from "@shared/schema";
 
 interface CalendarItem {
@@ -259,6 +260,18 @@ export default function CalendarView() {
           <h1 className="section-title" data-testid="text-page-title">Calendário</h1>
           <p className="section-subtitle">Visualize e filtre seus agendamentos por data.</p>
         </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => {
+            queryClient.invalidateQueries({ queryKey: ["/api/kanban/scheduled-cards"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+          }}
+          title="Atualizar"
+          data-testid="button-refresh-calendar"
+        >
+          <RefreshCw className="w-4 h-4" />
+        </Button>
       </div>
 
       {filterControls}
