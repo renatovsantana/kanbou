@@ -128,6 +128,7 @@ export function KanbanCardModal({ cardId, clientId, open, onClose }: KanbanCardM
   const [approvalNotes, setApprovalNotes] = useState("");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showApprovalConfirm, setShowApprovalConfirm] = useState(false);
+  const [attachmentToDelete, setAttachmentToDelete] = useState<{ id: string; name: string } | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isCoverUploading, setIsCoverUploading] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -822,7 +823,7 @@ export function KanbanCardModal({ cardId, clientId, open, onClose }: KanbanCardM
                                 variant="destructive"
                                 size="icon"
                                 className="absolute top-1 right-1 invisible group-hover:visible h-6 w-6"
-                                onClick={() => deleteAttachmentMutation.mutate(att.id)}
+                                onClick={() => setAttachmentToDelete({ id: att.id, name: att.name })}
                                 data-testid={`button-delete-attachment-${att.id}`}
                               >
                                 <X className="w-3 h-3" />
@@ -864,7 +865,7 @@ export function KanbanCardModal({ cardId, clientId, open, onClose }: KanbanCardM
                               variant="ghost"
                               size="icon"
                               className="invisible group-hover:visible h-6 w-6"
-                              onClick={() => deleteAttachmentMutation.mutate(att.id)}
+                              onClick={() => setAttachmentToDelete({ id: att.id, name: att.name })}
                               data-testid={`button-delete-attachment-${att.id}`}
                             >
                               <X className="w-3 h-3" />
@@ -1275,6 +1276,31 @@ export function KanbanCardModal({ cardId, clientId, open, onClose }: KanbanCardM
               data-testid="button-confirm-send-approval"
             >
               Confirmar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!attachmentToDelete} onOpenChange={(open) => { if (!open) setAttachmentToDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertTitle>Remover arquivo</AlertTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja remover o arquivo "{attachmentToDelete?.name}"? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-attachment">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (attachmentToDelete) {
+                  deleteAttachmentMutation.mutate(attachmentToDelete.id);
+                  setAttachmentToDelete(null);
+                }
+              }}
+              data-testid="button-confirm-delete-attachment"
+            >
+              Remover
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

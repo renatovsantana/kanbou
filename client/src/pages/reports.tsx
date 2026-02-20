@@ -156,10 +156,12 @@ export default function ReportsPage() {
 
   const { data: workflowData, isLoading: workflowLoading } = useQuery<WorkflowReport>({
     queryKey: [workflowQueryKey],
+    refetchInterval: 30000,
   });
 
   const { data: movementData, isLoading: movementLoading } = useQuery<MovementReport>({
     queryKey: [movementQueryKey],
+    refetchInterval: 30000,
   });
 
   const activityQueryKey = useMemo(() => {
@@ -194,6 +196,7 @@ export default function ReportsPage() {
 
   const { data: activityData = [], isLoading: activityLoading } = useQuery<ClientActivityReport[]>({
     queryKey: [activityQueryKey],
+    refetchInterval: 30000,
   });
 
   const toggleUser = (userId: number) => {

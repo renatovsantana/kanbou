@@ -2,7 +2,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertClientSchema, type InsertClient, type Client } from "@shared/schema";
 import { useCreateClient, useUpdateClient } from "@/hooks/use-clients";
-import { useUpload } from "@/hooks/use-upload";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,6 +16,7 @@ import {
 } from "@/components/ui/form";
 import { Loader2, Save, Upload } from "lucide-react";
 import { useState, useRef } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 interface ClientFormProps {
   client?: Client;
@@ -27,9 +27,10 @@ interface ClientFormProps {
 export function ClientForm({ client, onSuccess, onCancel }: ClientFormProps) {
   const createClient = useCreateClient();
   const updateClient = useUpdateClient();
-  const { uploadFile, isUploading, progress } = useUpload();
+  const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [logoUrl, setLogoUrl] = useState(client?.logoUrl || "");
+  const [isUploading, setIsUploading] = useState(false);
 
   const isEditing = !!client;
   const isPending = createClient.isPending || updateClient.isPending;
@@ -52,10 +53,28 @@ export function ClientForm({ client, onSuccess, onCancel }: ClientFormProps) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const result = await uploadFile(file);
-    if (result?.objectPath) {
-      setLogoUrl(result.objectPath);
-      form.setValue("logoUrl", result.objectPath);
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/uploads/logo", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Erro ao enviar logo");
+      }
+      const result = await res.json();
+      if (result?.objectPath) {
+        setLogoUrl(result.objectPath);
+        form.setValue("logoUrl", result.objectPath);
+      }
+    } catch (err: any) {
+      toast({ title: err.message || "Erro ao enviar logo", variant: "destructive" });
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -80,7 +99,7 @@ export function ClientForm({ client, onSuccess, onCancel }: ClientFormProps) {
             <div className="w-16 h-16 rounded-full bg-muted border border-input flex items-center justify-center overflow-hidden">
               {logoUrl ? (
                 <img
-                  src={logoUrl.startsWith("/") ? logoUrl : `/objects/${logoUrl}`}
+                  src={logoUrl}
                   alt="Logo do cliente"
                   className="w-full h-full object-cover"
                 />

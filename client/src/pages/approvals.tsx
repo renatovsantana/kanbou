@@ -1711,7 +1711,7 @@ export default function Approvals() {
                   <div className="flex items-center gap-3 mb-3">
                     {logoUrl ? (
                       <img
-                        src={logoUrl.startsWith("/") ? logoUrl : `/objects/${logoUrl}`}
+                        src={logoUrl}
                         alt={client.clientName}
                         className="w-10 h-10 rounded-md object-cover"
                         loading="lazy"

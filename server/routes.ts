@@ -1271,6 +1271,50 @@ export async function registerRoutes(
     res.sendFile(filePath);
   });
 
+  const LOGOS_DIR = path.join(process.cwd(), "uploads", "logos");
+  if (!fs.existsSync(LOGOS_DIR)) fs.mkdirSync(LOGOS_DIR, { recursive: true });
+
+  app.post("/api/uploads/logo", requireAuth, upload.single("file"), async (req, res) => {
+    try {
+      const file = (req as any).file;
+      if (!file) return res.status(400).json({ message: "Nenhum arquivo enviado" });
+
+      if (!file.mimetype.startsWith("image/")) {
+        return res.status(400).json({ message: "Apenas imagens são permitidas" });
+      }
+
+      if (file.size > 5 * 1024 * 1024) {
+        return res.status(400).json({ message: "Arquivo excede o limite de 5MB" });
+      }
+
+      const ext = path.extname(file.originalname) || ".png";
+      const filename = `${randomUUID()}${ext}`;
+
+      const optimized = await sharp(file.buffer)
+        .resize(400, 400, { fit: "inside", withoutEnlargement: true })
+        .png({ quality: 85 })
+        .toBuffer();
+
+      const filePath = path.join(LOGOS_DIR, filename);
+      fs.writeFileSync(filePath, optimized);
+
+      const objectPath = `/api/uploads/logo/${filename}`;
+      res.json({ objectPath });
+    } catch (err) {
+      console.error("Logo upload error:", err);
+      res.status(500).json({ message: "Erro ao fazer upload da logo" });
+    }
+  });
+
+  app.get("/api/uploads/logo/:filename", (req, res) => {
+    const filename = req.params.filename;
+    const safeName = path.basename(filename);
+    const filePath = path.join(LOGOS_DIR, safeName);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ message: "Logo não encontrada" });
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.sendFile(filePath);
+  });
+
   app.get("/api/briefings/:id", requireAuth, async (req, res) => {
     const id = parseInt(String(req.params.id));
     if (isNaN(id)) return res.status(400).json({ message: "ID inválido" });
@@ -2253,7 +2297,11 @@ export async function registerRoutes(
       };
       attachments.push(newAttachment);
 
-      const updated = await storage.updateKanbanCard(cardId, { attachments: JSON.stringify(attachments) });
+      const updateData: any = { attachments: JSON.stringify(attachments) };
+      if (isImage && !card.coverUrl && thumbnailUrl) {
+        updateData.coverUrl = thumbnailUrl;
+      }
+      const updated = await storage.updateKanbanCard(cardId, updateData);
       res.json(updated);
     } catch (err) {
       console.error("Error adding attachment:", err);
