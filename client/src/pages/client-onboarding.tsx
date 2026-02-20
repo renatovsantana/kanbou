@@ -8,6 +8,16 @@ import type { Client, Competitor, User } from "@shared/schema";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { RichTextEditor, RichTextDisplay } from "@/components/rich-text-editor";
@@ -1103,6 +1113,7 @@ function BrandIdentitySection({ clientId }: { clientId: number }) {
   const { user } = useAuth();
   const [uploading, setUploading] = useState(false);
   const [category, setCategory] = useState("manual");
+  const [fileToDelete, setFileToDelete] = useState<number | null>(null);
   const isEditor = user?.role === "admin" || user?.role === "designer";
 
   const { data: files = [] } = useQuery<BrandIdentityFileData[]>({
@@ -1248,7 +1259,7 @@ function BrandIdentitySection({ clientId }: { clientId: number }) {
                   </Button>
                 )}
                 {isEditor && (
-                  <Button variant="ghost" size="icon" onClick={() => handleDelete(f.id)} data-testid={`button-delete-brand-${f.id}`} title="Remover arquivo">
+                  <Button variant="ghost" size="icon" onClick={() => setFileToDelete(f.id)} data-testid={`button-delete-brand-${f.id}`} title="Remover arquivo">
                     <Trash2 className="w-4 h-4 text-destructive" />
                   </Button>
                 )}
@@ -1257,6 +1268,32 @@ function BrandIdentitySection({ clientId }: { clientId: number }) {
           ))}
         </div>
       )}
+
+      <AlertDialog open={fileToDelete !== null} onOpenChange={(open) => !open && setFileToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover arquivo</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja remover este arquivo da identidade visual? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-brand">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="button-confirm-delete-brand"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (fileToDelete !== null) {
+                  handleDelete(fileToDelete);
+                  setFileToDelete(null);
+                }
+              }}
+            >
+              Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
