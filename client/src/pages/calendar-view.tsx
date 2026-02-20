@@ -36,6 +36,7 @@ export default function CalendarView() {
   const { data: posts, isLoading: postsLoading } = usePosts();
   const { data: scheduledCards = [], isLoading: cardsLoading } = useQuery<any[]>({
     queryKey: ["/api/kanban/scheduled-cards"],
+    refetchInterval: 30000,
   });
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["/api/clients"] });
   const [activeTab, setActiveTab] = useState("calendar");

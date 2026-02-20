@@ -91,15 +91,19 @@ export default function Dashboard() {
   const { data: posts, isLoading: postsLoading } = usePosts();
   const { data: approvals = [], isLoading: approvalsLoading } = useQuery<ApprovalPost[]>({
     queryKey: ["/api/approvals"],
+    refetchInterval: 30000,
   });
   const { data: clientsList = [], isLoading: clientsLoading } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
+    refetchInterval: 30000,
   });
   const { data: insights, isLoading: insightsLoading } = useQuery<InsightsData>({
     queryKey: ["/api/insights/overview"],
+    refetchInterval: 30000,
   });
   const { data: allCompetitors = [] } = useQuery<Competitor[]>({
     queryKey: ["/api/competitors"],
+    refetchInterval: 30000,
   });
 
   const [selectedHashtagCategory, setSelectedHashtagCategory] = useState("marketing");

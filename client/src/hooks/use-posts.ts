@@ -12,7 +12,6 @@ export function usePosts(filters?: { search?: string; client?: string; status?: 
   return useQuery({
     queryKey,
     queryFn: async () => {
-      // Build URL with query params
       const url = new URL(api.posts.list.path, window.location.origin);
       if (filters?.search) url.searchParams.append("search", filters.search);
       if (filters?.client) url.searchParams.append("client", filters.client);
@@ -24,6 +23,7 @@ export function usePosts(filters?: { search?: string; client?: string; status?: 
       const data = await res.json();
       return api.posts.list.responses[200].parse(data);
     },
+    refetchInterval: 30000,
   });
 }
 
