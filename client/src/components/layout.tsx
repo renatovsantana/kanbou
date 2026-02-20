@@ -30,7 +30,7 @@ import {
   Settings,
   Lightbulb,
 } from "lucide-react";
-import { useState, useMemo, createContext, useContext } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback, createContext, useContext } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -244,6 +244,44 @@ export function Layout({ children }: { children: React.ReactNode }) {
   });
 
   const unreadCount = unreadData?.count ?? 0;
+
+  const prevUnreadRef = useRef<number>(unreadCount);
+  const hasInitializedRef = useRef(false);
+
+  const requestNotificationPermission = useCallback(() => {
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }, []);
+
+  useEffect(() => {
+    requestNotificationPermission();
+  }, [requestNotificationPermission]);
+
+  useEffect(() => {
+    if (!hasInitializedRef.current) {
+      hasInitializedRef.current = true;
+      prevUnreadRef.current = unreadCount;
+      return;
+    }
+
+    if (unreadCount > prevUnreadRef.current && "Notification" in window && Notification.permission === "granted") {
+      const newCount = unreadCount - prevUnreadRef.current;
+      const latestUnread = notifications.filter(n => !n.isRead).slice(0, newCount);
+      const message = latestUnread.length > 0
+        ? latestUnread[0].message
+        : `Você tem ${newCount} nova(s) notificação(ões)`;
+
+      try {
+        new window.Notification(sysName, {
+          body: message,
+          icon: sysLogo || undefined,
+          tag: "shift-notification",
+        });
+      } catch {}
+    }
+    prevUnreadRef.current = unreadCount;
+  }, [unreadCount, notifications, sysName, sysLogo]);
 
   const markAllReadMutation = useMutation({
     mutationFn: async () => {
