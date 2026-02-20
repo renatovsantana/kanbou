@@ -127,7 +127,7 @@ export default function CalendarView() {
       .filter(item => {
         if (!item.scheduledDate) return false;
         const itemDate = new Date(item.scheduledDate);
-        return isBefore(itemDate, today) && item.status !== "Publicado" && item.status !== "published";
+        return isBefore(itemDate, today) && item.status !== "Publicado" && item.status !== "published" && item.status !== "Postado";
       })
       .sort((a, b) => new Date(a.scheduledDate).getTime() - new Date(b.scheduledDate).getTime());
   }, [filteredItems]);
