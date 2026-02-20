@@ -17,6 +17,7 @@ import {
 import { Loader2, Save, Upload } from "lucide-react";
 import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { ImageCropper } from "@/components/image-cropper";
 
 interface ClientFormProps {
   client?: Client;
@@ -31,6 +32,8 @@ export function ClientForm({ client, onSuccess, onCancel }: ClientFormProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [logoUrl, setLogoUrl] = useState(client?.logoUrl || "");
   const [isUploading, setIsUploading] = useState(false);
+  const [cropperOpen, setCropperOpen] = useState(false);
+  const [rawImageSrc, setRawImageSrc] = useState("");
 
   const isEditing = !!client;
   const isPending = createClient.isPending || updateClient.isPending;
@@ -49,14 +52,24 @@ export function ClientForm({ client, onSuccess, onCancel }: ClientFormProps) {
     },
   });
 
-  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setRawImageSrc(reader.result as string);
+      setCropperOpen(true);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
 
+  const handleCroppedImage = async (blob: Blob) => {
+    setCropperOpen(false);
     setIsUploading(true);
     try {
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", blob, "logo.png");
       const res = await fetch("/api/uploads/logo", {
         method: "POST",
         body: formData,
@@ -112,7 +125,7 @@ export function ClientForm({ client, onSuccess, onCancel }: ClientFormProps) {
                 ref={fileInputRef}
                 type="file"
                 accept="image/*"
-                onChange={handleLogoUpload}
+                onChange={handleFileSelect}
                 disabled={isUploading}
                 data-testid="input-client-logo"
                 className="hidden"
@@ -300,6 +313,16 @@ export function ClientForm({ client, onSuccess, onCancel }: ClientFormProps) {
           </Button>
         </div>
       </form>
+
+      <ImageCropper
+        open={cropperOpen}
+        imageSrc={rawImageSrc}
+        onClose={() => setCropperOpen(false)}
+        onCropDone={handleCroppedImage}
+        cropShape="round"
+        aspect={1}
+        title="Ajustar logo do cliente"
+      />
     </Form>
   );
 }
