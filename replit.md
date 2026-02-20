@@ -28,7 +28,7 @@ Preferred communication style: Simple, everyday language.
     - **Overdue Scheduling Detection**: Post-type Kanban cards with a publishDate in the past are automatically moved to an "Agendamento Atrasado" section at the bottom of their column, separated by a red visual divider with AlertTriangle icon. Columns "Agendados", "Postados", "Finalizados" are exempt from overdue detection.
     - **Workflow Reports**: Comprehensive reports page with two tabs - "Fluxo de Trabalho" (workflow metrics with filters by client, card type, user, period, with Recharts charts) and "Atividade por Usuário" (movement-based activity tracking showing who moved cards, time per column, production stage metrics). Accessible at `/reports`.
     - **Production Stage Tracking**: Automatic time tracking for cards in "Fila", "Desenvolvendo Design", and "Desenvolvendo Copy" columns. Timer starts when card enters these columns and stops when it leaves. TIMED_COLUMNS constant defines which columns are tracked.
-    - **Kanban Default Columns**: Fila → Desenvolvendo Design → Desenvolvendo Copy → Em Aprovação → Tráfego e RDS → Revisão → Aprovados → Reprovados → Agendados → Postados → Finalizados → Fotos já usadas (defined in DEFAULT_KANBAN_COLUMNS). "Informações" and "Próximos serviços" were removed.
+    - **Kanban Default Columns**: Fila → Desenvolvendo Design → Desenvolvendo Copy → Em Aprovação → Tráfego e RDS → Revisão → Aprovados → Reprovados → Agendados → Postados → Finalizados (defined in DEFAULT_KANBAN_COLUMNS). "Informações", "Próximos serviços" and "Fotos já usadas" were removed.
     - **Mandatory First Column**: All new cards are always created in "Fila" column (MANDATORY_FIRST_COLUMN). Time tracking starts automatically on creation. The "Adicionar cartão" button only appears on the Fila column.
     - **Fixed Kanban Columns**: "Agendados", "Postados", "Finalizados" are fixed columns that cannot be deleted or renamed (FIXED_KANBAN_COLUMNS). All protected columns (including "Fila" and approval columns) are defined in PROTECTED_KANBAN_COLUMNS.
     - **Notification System**: Real-time notification bell in sidebar (desktop) and mobile header. Notifications triggered on: approval sent, card approved, card rejected, revision requested, comment added, card scheduled. Bell shows unread count badge. Sidebar Quadro and Posts items show notification count badges. Polling every 15s for new notifications. API: GET /api/notifications, GET /api/notifications/unread-count, PUT /api/notifications/:id/read, PUT /api/notifications/read-all.
@@ -59,11 +59,15 @@ Preferred communication style: Simple, everyday language.
 ## Deployment
 
 - **Target**: Self-hosted on Hostinger VPS (not Replit)
+- **VPS IP**: 195.35.18.161
+- **Domain**: kanbou.com.br
 - **Guide**: See `DEPLOY.md` for full deployment instructions
 - **Env Example**: See `.env.example` for required environment variables
 - **Build**: `npm run build` → `dist/public/` (frontend) + `dist/index.cjs` (backend)
 - **Start**: `npm start` (production) or `npm run dev` (development)
 - **No Replit Dependencies**: Google Drive uses standard OAuth2 credentials, file uploads use local filesystem (`uploads/` directory), no Replit-specific services required
+- **Deploy Flow**: Replit (development) → GitHub (backup at github.com/renatovsantana/kanbou) → VPS (production). Deploy script: `bash scripts/deploy.sh`
+- **GitHub**: Private repo at `renatovsantana/kanbou`, branch `main`. VPS has GitHub remote configured for pull/push.
 
 ## External Dependencies
 

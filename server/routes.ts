@@ -404,9 +404,13 @@ export async function registerRoutes(
   });
 
   app.get(api.posts.get.path, requireAuth, async (req, res) => {
+    const user = await getCurrentUser(req);
     const post = await storage.getPost(Number(req.params.id));
     if (!post) {
       return res.status(404).json({ message: 'Post não encontrado' });
+    }
+    if (user?.role === "client" && user.clientId && post.clientId !== user.clientId) {
+      return res.status(403).json({ message: "Sem permissão" });
     }
     res.json(post);
   });
@@ -1816,17 +1820,23 @@ export async function registerRoutes(
         "Postados": ["Finalizados"],
       };
 
-      if (fromCol && PROTECTED_KANBAN_COLUMNS.includes(fromCol.title)) {
+      const restrictedFromColumns = ["Em Aprovação", "Aprovados", "Agendados", "Postados"];
+      const restrictedToColumns = ["Aprovados", "Reprovados", "Agendados", "Postados", "Finalizados"];
+
+      if (fromCol && restrictedFromColumns.includes(fromCol.title)) {
         const allowed = allowedManualMoves[fromCol.title] || [];
-        if (toCol?.title !== "Em Aprovação" && !allowed.includes(toCol?.title || "")) {
-          return res.status(403).json({ message: `Cartão na coluna "${fromCol.title}" só pode ser movido via ações de aprovação` });
+        if (allowed.length === 0) {
+          return res.status(403).json({ message: `Cartão em "${fromCol.title}" não pode ser movido manualmente. Aguarde a ação do cliente.` });
+        }
+        if (!allowed.includes(toCol?.title || "")) {
+          return res.status(403).json({ message: `Cartão na coluna "${fromCol.title}" só pode ser movido para: ${allowed.join(", ")}` });
         }
       }
 
-      if (toCol && PROTECTED_KANBAN_COLUMNS.includes(toCol.title) && toCol.title !== "Em Aprovação") {
+      if (toCol && restrictedToColumns.includes(toCol.title)) {
         const fromAllowed = allowedManualMoves[fromCol?.title || ""] || [];
         if (!fromAllowed.includes(toCol.title)) {
-          return res.status(403).json({ message: `Use as ações de aprovação para mover para "${toCol.title}"` });
+          return res.status(403).json({ message: `Não é permitido mover diretamente para "${toCol.title}". Use o fluxo de aprovação.` });
         }
       }
     }
@@ -2699,8 +2709,13 @@ export async function registerRoutes(
       const { clientId, month, year } = req.query;
       const targetClientId = clientId ? Number(clientId) : null;
 
-      if (user.role === "client" && !targetClientId) {
-        return res.status(400).json({ message: "clientId é obrigatório para clientes" });
+      if (user.role === "client") {
+        if (!user.clientId) {
+          return res.status(403).json({ message: "Sem permissão" });
+        }
+        if (targetClientId && targetClientId !== user.clientId) {
+          return res.status(403).json({ message: "Sem permissão para acessar dados de outro cliente" });
+        }
       }
 
       const now = new Date();
@@ -2710,7 +2725,9 @@ export async function registerRoutes(
       const endDate = new Date(targetYear, targetMonth + 1, 0, 23, 59, 59, 999);
 
       let clientIds: number[] = [];
-      if (targetClientId) {
+      if (user.role === "client" && user.clientId) {
+        clientIds = [user.clientId];
+      } else if (targetClientId) {
         clientIds = [targetClientId];
       } else if (user.role === "admin" || user.role === "designer") {
         const allClients = await storage.getClients();

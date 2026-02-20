@@ -856,6 +856,7 @@ export default function KanbanBoard() {
   const [addingColumn, setAddingColumn] = useState(false);
   const [newColumnTitle, setNewColumnTitle] = useState("");
   const newColRef = useRef<HTMLInputElement>(null);
+  const [pendingApprovalMove, setPendingApprovalMove] = useState<{ cardId: number; toColumnId: number; newPosition: number } | null>(null);
   const { collapsed, setCollapsed } = useSidebarCollapse();
 
   const { data: clients = [], isLoading: loadingClients } = useQuery<Client[]>({
@@ -1068,6 +1069,12 @@ export default function KanbanBoard() {
       return;
     }
 
+    const targetCol = sortedColumns.find(c => c.id === targetColumnId);
+    if (targetCol && targetCol.title === "Em Aprovação" && activeColumnId !== targetColumnId) {
+      setPendingApprovalMove({ cardId: activeCardId, toColumnId: targetColumnId, newPosition: targetPosition });
+      return;
+    }
+
     moveCardMutation.mutate({
       cardId: activeCardId,
       toColumnId: targetColumnId,
@@ -1233,6 +1240,31 @@ export default function KanbanBoard() {
               data-testid="button-confirm-delete-column"
             >
               Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!pendingApprovalMove} onOpenChange={(open) => { if (!open) setPendingApprovalMove(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Enviar para aprovação</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja enviar este cartão para aprovação do cliente? Uma vez em aprovação, somente o cliente poderá aprovar, reprovar ou solicitar revisão.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-approval-move">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (pendingApprovalMove) {
+                  moveCardMutation.mutate(pendingApprovalMove);
+                  setPendingApprovalMove(null);
+                }
+              }}
+              data-testid="button-confirm-approval-move"
+            >
+              Confirmar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

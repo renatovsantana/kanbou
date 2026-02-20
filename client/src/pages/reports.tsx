@@ -95,9 +95,10 @@ const CHART_COLORS = ["#84cc16", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6", "#e
 
 export default function ReportsPage() {
   const { user } = useAuth();
+  const isClient = user?.role === "client";
   const [expandedUsers, setExpandedUsers] = useState<Set<number>>(new Set());
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
-  const [activeTab, setActiveTab] = useState("workflow");
+  const [activeTab, setActiveTab] = useState(isClient ? "client-activity" : "workflow");
 
   const [clientFilter, setClientFilter] = useState<string>("all");
   const [cardTypeFilter, setCardTypeFilter] = useState<string>("all");
@@ -109,7 +110,7 @@ export default function ReportsPage() {
   const [movPeriodFilter, setMovPeriodFilter] = useState<string>("30");
 
   const now = new Date();
-  const [actClientFilter, setActClientFilter] = useState<string>("all");
+  const [actClientFilter, setActClientFilter] = useState<string>(isClient && user?.clientId ? String(user.clientId) : "all");
   const [actMonth, setActMonth] = useState<string>(String(now.getMonth() + 1));
   const [actYear, setActYear] = useState<string>(String(now.getFullYear()));
 
@@ -267,14 +268,18 @@ export default function ReportsPage() {
 
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList data-testid="tabs-reports">
-              <TabsTrigger value="workflow" data-testid="tab-workflow">
-                <FileText className="w-4 h-4 mr-2" />
-                Fluxo de Trabalho
-              </TabsTrigger>
-              <TabsTrigger value="movements" data-testid="tab-movements">
-                <MoveRight className="w-4 h-4 mr-2" />
-                Atividade por Usuário
-              </TabsTrigger>
+              {!isClient && (
+                <>
+                  <TabsTrigger value="workflow" data-testid="tab-workflow">
+                    <FileText className="w-4 h-4 mr-2" />
+                    Fluxo de Trabalho
+                  </TabsTrigger>
+                  <TabsTrigger value="movements" data-testid="tab-movements">
+                    <MoveRight className="w-4 h-4 mr-2" />
+                    Atividade por Usuário
+                  </TabsTrigger>
+                </>
+              )}
               <TabsTrigger value="client-activity" data-testid="tab-client-activity">
                 <Building2 className="w-4 h-4 mr-2" />
                 Relatório por Cliente
@@ -732,21 +737,23 @@ export default function ReportsPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div>
-                      <label className="text-xs text-muted-foreground mb-1 block">Cliente</label>
-                      <Select value={actClientFilter} onValueChange={setActClientFilter}>
-                        <SelectTrigger data-testid="select-act-client-filter">
-                          <SelectValue placeholder="Todos os clientes" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Todos os clientes</SelectItem>
-                          {clientsData.map((c) => (
-                            <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  <div className={`grid grid-cols-1 ${isClient ? "sm:grid-cols-2" : "sm:grid-cols-3"} gap-3`}>
+                    {!isClient && (
+                      <div>
+                        <label className="text-xs text-muted-foreground mb-1 block">Cliente</label>
+                        <Select value={actClientFilter} onValueChange={setActClientFilter}>
+                          <SelectTrigger data-testid="select-act-client-filter">
+                            <SelectValue placeholder="Todos os clientes" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Todos os clientes</SelectItem>
+                            {clientsData.map((c) => (
+                              <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                     <div>
                       <label className="text-xs text-muted-foreground mb-1 block">Mês</label>
                       <Select value={actMonth} onValueChange={setActMonth}>

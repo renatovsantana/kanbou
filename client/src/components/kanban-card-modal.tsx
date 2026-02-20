@@ -127,6 +127,7 @@ export function KanbanCardModal({ cardId, clientId, open, onClose }: KanbanCardM
   const [showCoverInput, setShowCoverInput] = useState(false);
   const [approvalNotes, setApprovalNotes] = useState("");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showApprovalConfirm, setShowApprovalConfirm] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isCoverUploading, setIsCoverUploading] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -1201,7 +1202,7 @@ export function KanbanCardModal({ cardId, clientId, open, onClose }: KanbanCardM
                   <Button
                     variant="secondary"
                     className="w-full justify-start text-xs"
-                    onClick={() => sendApprovalMutation.mutate()}
+                    onClick={() => setShowApprovalConfirm(true)}
                     disabled={sendApprovalMutation.isPending}
                     data-testid="button-send-approval"
                   >
@@ -1251,6 +1252,29 @@ export function KanbanCardModal({ cardId, clientId, open, onClose }: KanbanCardM
               data-testid="button-confirm-delete"
             >
               Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showApprovalConfirm} onOpenChange={setShowApprovalConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertTitle>Enviar para aprovação</AlertTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja enviar este cartão para aprovação do cliente? Uma vez em aprovação, somente o cliente poderá aprovar, reprovar ou solicitar revisão.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-send-approval">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                sendApprovalMutation.mutate();
+                setShowApprovalConfirm(false);
+              }}
+              data-testid="button-confirm-send-approval"
+            >
+              Confirmar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

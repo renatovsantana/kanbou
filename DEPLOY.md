@@ -203,16 +203,40 @@ pm2 monit
 
 ---
 
-## Atualização
+## Fluxo de Deploy (Replit → GitHub → VPS)
 
-Para atualizar o sistema quando houver novas versões:
+O fluxo de deploy segue a ordem abaixo para garantir integridade e backup:
 
-```bash
-cd /var/www/kanbou
-bash scripts/update.sh
+```
+┌──────────┐     ┌──────────┐     ┌──────────┐
+│  REPLIT   │ ──> │  GITHUB  │ ──> │   VPS    │
+│ Desenvolv.│     │  Backup  │     │ Produção │
+└──────────┘     └──────────┘     └──────────┘
 ```
 
-Ou manualmente:
+### Deploy automatizado (a partir do Replit):
+
+```bash
+bash scripts/deploy.sh
+```
+
+O script faz automaticamente:
+1. Compila o projeto (frontend + backend)
+2. Envia os arquivos compilados para o VPS
+3. Sincroniza os arquivos fonte para o VPS
+4. Faz commit e push para o GitHub (backup)
+5. Atualiza o banco e reinicia o PM2
+
+### Repositório GitHub:
+- **URL**: https://github.com/renatovsantana/kanbou
+- **Branch principal**: `main`
+- **Visibilidade**: Privado
+
+---
+
+## Atualização a partir do GitHub (no VPS)
+
+Para atualizar o VPS diretamente do GitHub:
 
 ```bash
 cd /var/www/kanbou

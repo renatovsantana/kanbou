@@ -119,20 +119,24 @@ export default function CalendarView() {
     </div>
   );
 
+  const isClient = user?.role === "client";
+
   const filterControls = (
     <div className="flex flex-wrap gap-2 items-center" data-testid="calendar-filters">
       <Filter className="w-4 h-4 text-muted-foreground" />
-      <Select value={clientFilter} onValueChange={setClientFilter}>
-        <SelectTrigger className="w-[160px]" data-testid="filter-client">
-          <SelectValue placeholder="Todos os clientes" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">Todos os clientes</SelectItem>
-          {clients.map(c => (
-            <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      {!isClient && (
+        <Select value={clientFilter} onValueChange={setClientFilter}>
+          <SelectTrigger className="w-[160px]" data-testid="filter-client">
+            <SelectValue placeholder="Todos os clientes" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os clientes</SelectItem>
+            {clients.map(c => (
+              <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
       <Select value={platformFilter} onValueChange={setPlatformFilter}>
         <SelectTrigger className="w-[140px]" data-testid="filter-platform">
           <SelectValue placeholder="Plataforma" />
@@ -157,11 +161,11 @@ export default function CalendarView() {
           ))}
         </SelectContent>
       </Select>
-      {(clientFilter !== "all" || platformFilter !== "all" || statusFilter !== "all") && (
+      {((!isClient && clientFilter !== "all") || platformFilter !== "all" || statusFilter !== "all") && (
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => { setClientFilter("all"); setPlatformFilter("all"); setStatusFilter("all"); }}
+          onClick={() => { if (!isClient) setClientFilter("all"); setPlatformFilter("all"); setStatusFilter("all"); }}
           data-testid="button-clear-filters"
         >
           Limpar filtros
