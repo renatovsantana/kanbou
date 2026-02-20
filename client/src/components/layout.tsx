@@ -49,6 +49,13 @@ import type { Client, Notification } from "@shared/schema";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
+type BrandingData = {
+  systemName: string;
+  systemLogo: string;
+  systemFavicon: string;
+  systemTheme: string;
+};
+
 const SidebarContext = createContext<{
   collapsed: boolean;
   setCollapsed: (v: boolean) => void;
@@ -210,6 +217,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const { theme, toggleTheme } = useTheme();
 
   const role = user?.role || "admin";
+
+  const { data: branding } = useQuery<BrandingData>({
+    queryKey: ["/api/settings/branding"],
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const sysName = branding?.systemName || "Shift";
+  const sysLogo = branding?.systemLogo || "";
+  const sysInitial = sysName.charAt(0).toUpperCase();
 
   const { data: clientsList = [] } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
@@ -500,11 +516,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
     <div className="flex flex-col h-full" style={{ background: 'hsl(var(--sidebar-bg))' }}>
       <div className="p-5 pb-8">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-lg" style={{ background: 'hsl(var(--sidebar-accent))', color: 'hsl(0 0% 10%)' }}>
-            S
-          </div>
+          {sysLogo ? (
+            <img src={sysLogo} alt={sysName} className="w-10 h-10 rounded-xl object-contain" />
+          ) : (
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-lg" style={{ background: 'hsl(var(--sidebar-accent))', color: 'hsl(0 0% 10%)' }}>
+              {sysInitial}
+            </div>
+          )}
           <div>
-            <h1 className="font-display font-bold text-base leading-tight" style={{ color: 'hsl(var(--sidebar-fg))' }}>Shift</h1>
+            <h1 className="font-display font-bold text-base leading-tight" style={{ color: 'hsl(var(--sidebar-fg))' }}>{sysName}</h1>
             <p className="text-[11px] font-medium" style={{ color: 'hsl(var(--sidebar-fg) / 0.4)' }}>Agency Manager</p>
           </div>
         </div>
@@ -631,10 +651,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <Menu className="w-5 h-5" />
             </Button>
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg flex items-center justify-center font-bold text-sm" style={{ background: 'hsl(var(--sidebar-accent))', color: 'hsl(0 0% 10%)' }}>
-                S
-              </div>
-              <span className="font-display font-bold text-sm" style={{ color: 'hsl(var(--sidebar-fg))' }}>Shift Agency</span>
+              {sysLogo ? (
+                <img src={sysLogo} alt={sysName} className="w-7 h-7 rounded-lg object-contain" />
+              ) : (
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center font-bold text-sm" style={{ background: 'hsl(var(--sidebar-accent))', color: 'hsl(0 0% 10%)' }}>
+                  {sysInitial}
+                </div>
+              )}
+              <span className="font-display font-bold text-sm" style={{ color: 'hsl(var(--sidebar-fg))' }}>{sysName}</span>
             </div>
           </div>
           <div className="flex items-center gap-1">

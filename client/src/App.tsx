@@ -1,6 +1,7 @@
+import { useEffect } from "react";
 import { Switch, Route, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/lib/auth";
@@ -75,12 +76,40 @@ function Router() {
   );
 }
 
+function DynamicBranding() {
+  const { data: branding } = useQuery<{ systemName: string; systemFavicon: string; systemTheme: string }>({
+    queryKey: ["/api/settings/branding"],
+    staleTime: 5 * 60 * 1000,
+  });
+
+  useEffect(() => {
+    if (branding?.systemName) {
+      document.title = `${branding.systemName} - Agency Manager`;
+    }
+  }, [branding?.systemName]);
+
+  useEffect(() => {
+    if (branding?.systemFavicon) {
+      let link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
+      if (!link) {
+        link = document.createElement("link");
+        link.rel = "icon";
+        document.head.appendChild(link);
+      }
+      link.href = branding.systemFavicon;
+    }
+  }, [branding?.systemFavicon]);
+
+  return null;
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <ThemeProvider>
           <AuthProvider>
+            <DynamicBranding />
             <Toaster />
             <Router />
           </AuthProvider>

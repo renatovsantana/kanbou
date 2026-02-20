@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth";
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,10 +9,26 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 
+type BrandingData = {
+  systemName: string;
+  systemLogo: string;
+  systemFavicon: string;
+  systemTheme: string;
+};
+
 export default function LoginPage() {
   const { login } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+
+  const { data: branding } = useQuery<BrandingData>({
+    queryKey: ["/api/settings/branding"],
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const sysName = branding?.systemName || "Shift";
+  const sysLogo = branding?.systemLogo || "";
+  const sysInitial = sysName.charAt(0).toUpperCase();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -44,11 +61,15 @@ export default function LoginPage() {
       <div className="hidden lg:flex lg:w-1/2 items-center justify-center p-12" style={{ background: 'hsl(0 0% 10%)' }}>
         <div className="max-w-md space-y-8">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center font-bold text-xl" style={{ background: 'hsl(135 55% 58%)', color: 'hsl(0 0% 10%)' }}>
-              S
-            </div>
+            {sysLogo ? (
+              <img src={sysLogo} alt={sysName} className="w-12 h-12 rounded-xl object-contain" />
+            ) : (
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center font-bold text-xl" style={{ background: 'hsl(var(--primary))', color: 'hsl(0 0% 100%)' }}>
+                {sysInitial}
+              </div>
+            )}
             <div>
-              <h2 className="font-display text-2xl font-bold" style={{ color: 'hsl(0 0% 92%)' }}>Shift</h2>
+              <h2 className="font-display text-2xl font-bold" style={{ color: 'hsl(0 0% 92%)' }}>{sysName}</h2>
               <p className="text-sm" style={{ color: 'hsl(0 0% 55%)' }}>Agency Manager</p>
             </div>
           </div>
@@ -85,11 +106,15 @@ export default function LoginPage() {
       <div className="flex-1 bg-background flex items-center justify-center p-6">
         <div className="w-full max-w-sm space-y-8">
           <div className="lg:hidden text-center space-y-3">
-            <div className="w-12 h-12 rounded-xl mx-auto flex items-center justify-center font-bold text-xl bg-primary text-primary-foreground">
-              S
-            </div>
+            {sysLogo ? (
+              <img src={sysLogo} alt={sysName} className="w-12 h-12 rounded-xl mx-auto object-contain" />
+            ) : (
+              <div className="w-12 h-12 rounded-xl mx-auto flex items-center justify-center font-bold text-xl bg-primary text-primary-foreground">
+                {sysInitial}
+              </div>
+            )}
             <h1 className="font-display text-2xl font-bold text-foreground" data-testid="text-login-title">
-              Shift Agency
+              {sysName}
             </h1>
           </div>
 

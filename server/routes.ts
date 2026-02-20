@@ -1588,6 +1588,101 @@ export async function registerRoutes(
     }
   });
 
+  // === SYSTEM BRANDING SETTINGS ===
+
+  const SYSTEM_UPLOADS_DIR = path.join(process.cwd(), "uploads", "system");
+  if (!fs.existsSync(SYSTEM_UPLOADS_DIR)) fs.mkdirSync(SYSTEM_UPLOADS_DIR, { recursive: true });
+
+  app.get("/api/settings/branding", async (_req, res) => {
+    try {
+      const settings = await storage.getSystemSettings([
+        "SYSTEM_NAME", "SYSTEM_LOGO", "SYSTEM_FAVICON", "SYSTEM_THEME",
+      ]);
+      res.json({
+        systemName: settings.SYSTEM_NAME || "Shift",
+        systemLogo: settings.SYSTEM_LOGO || "",
+        systemFavicon: settings.SYSTEM_FAVICON || "",
+        systemTheme: settings.SYSTEM_THEME || "classic",
+      });
+    } catch (err) {
+      console.error("Error getting branding settings:", err);
+      res.status(500).json({ message: "Erro ao buscar configurações" });
+    }
+  });
+
+  app.put("/api/settings/branding", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const { systemName, systemTheme } = req.body;
+      if (systemName !== undefined) await storage.setSystemSetting("SYSTEM_NAME", systemName);
+      if (systemTheme !== undefined) {
+        const validThemes = ["classic", "business", "creative"];
+        if (!validThemes.includes(systemTheme)) {
+          return res.status(400).json({ message: "Tema inválido" });
+        }
+        await storage.setSystemSetting("SYSTEM_THEME", systemTheme);
+      }
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Error saving branding settings:", err);
+      res.status(500).json({ message: "Erro ao salvar configurações" });
+    }
+  });
+
+  app.post("/api/uploads/system/:type", requireAuth, requireRole("admin"), upload.single("file"), async (req, res) => {
+    try {
+      const uploadType = req.params.type;
+      if (!["logo", "favicon"].includes(uploadType)) {
+        return res.status(400).json({ message: "Tipo inválido" });
+      }
+      const file = (req as any).file;
+      if (!file) return res.status(400).json({ message: "Nenhum arquivo enviado" });
+      if (!file.mimetype.startsWith("image/")) {
+        return res.status(400).json({ message: "Apenas imagens são permitidas" });
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        return res.status(400).json({ message: "Arquivo excede o limite de 5MB" });
+      }
+
+      const rawExt = path.extname(file.originalname).toLowerCase();
+      const allowedExts = [".png", ".jpg", ".jpeg", ".svg", ".ico", ".webp", ".gif"];
+      const ext = allowedExts.includes(rawExt) ? rawExt : ".png";
+      const filename = `${uploadType}_${Date.now()}${ext}`;
+
+      let processedBuffer: Buffer;
+      if (uploadType === "favicon") {
+        processedBuffer = await sharp(file.buffer)
+          .resize(64, 64, { fit: "cover" })
+          .png()
+          .toBuffer();
+      } else {
+        processedBuffer = await sharp(file.buffer)
+          .resize(400, 400, { fit: "inside", withoutEnlargement: true })
+          .png({ quality: 90 })
+          .toBuffer();
+      }
+
+      const filePath = path.join(SYSTEM_UPLOADS_DIR, filename);
+      fs.writeFileSync(filePath, processedBuffer);
+
+      const objectPath = `/api/uploads/system/${filename}`;
+      const settingKey = uploadType === "logo" ? "SYSTEM_LOGO" : "SYSTEM_FAVICON";
+      await storage.setSystemSetting(settingKey, objectPath);
+
+      res.json({ objectPath });
+    } catch (err) {
+      console.error("System upload error:", err);
+      res.status(500).json({ message: "Erro ao fazer upload" });
+    }
+  });
+
+  app.get("/api/uploads/system/:filename", (req, res) => {
+    const safeName = path.basename(req.params.filename);
+    const filePath = path.join(SYSTEM_UPLOADS_DIR, safeName);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ message: "Arquivo não encontrado" });
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.sendFile(filePath);
+  });
+
   // === GOOGLE DRIVE ROUTES ===
 
   app.get("/api/drive/status", requireRole("admin"), async (_req, res) => {
