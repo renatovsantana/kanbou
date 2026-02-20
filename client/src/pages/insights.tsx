@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { useSearch } from "wouter";
 import type { Client } from "@shared/schema";
+import { isInternalRole } from "@shared/schema";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -55,7 +56,7 @@ export default function InsightsPage() {
   const searchString = useSearch();
   const urlParams = new URLSearchParams(searchString);
   const urlClientId = urlParams.get("clientId");
-  const isClient = user?.role === "client";
+  const isClient = !isInternalRole(user?.role || "");
   const clientAutoId = isClient && user?.clientId ? String(user.clientId) : null;
   const initialClientId = urlClientId || clientAutoId || "all";
   const [selectedClientId, setSelectedClientId] = useState<string>(initialClientId);
@@ -113,7 +114,7 @@ export default function InsightsPage() {
     },
   });
 
-  const canDeleteAll = user?.role === "admin" || user?.role === "designer";
+  const canDeleteAll = isInternalRole(user?.role || "");
   const postClientId = isClient
     ? (user?.clientId || null)
     : (selectedClientId !== "all" ? Number(selectedClientId) : null);

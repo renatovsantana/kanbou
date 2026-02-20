@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { useSearch } from "wouter";
 import type { Client, Competitor, User } from "@shared/schema";
+import { isInternalRole } from "@shared/schema";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -116,7 +117,7 @@ export default function ClientOnboarding() {
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["/api/clients"] });
   const { data: users = [] } = useQuery<User[]>({
     queryKey: ["/api/users"],
-    enabled: user?.role === "admin" || user?.role === "designer",
+    enabled: isInternalRole(user?.role || ""),
   });
 
   const clientObj = clients.find(c => c.id === clientId);
@@ -921,7 +922,7 @@ function CredentialsSection({ clientId, credentials }: { clientId: number; crede
 function CompetitorsSection({ clientId, competitors }: { clientId: number; competitors: Competitor[] }) {
   const { toast } = useToast();
   const { user } = useAuth();
-  const isEditor = user?.role === "admin" || user?.role === "designer";
+  const isEditor = isInternalRole(user?.role || "");
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Competitor | null>(null);
   const [competitorToDelete, setCompetitorToDelete] = useState<number | null>(null);
@@ -1229,7 +1230,7 @@ function BrandIdentitySection({ clientId }: { clientId: number }) {
   const [uploading, setUploading] = useState(false);
   const [category, setCategory] = useState("manual");
   const [fileToDelete, setFileToDelete] = useState<number | null>(null);
-  const isEditor = user?.role === "admin" || user?.role === "designer";
+  const isEditor = isInternalRole(user?.role || "");
 
   const { data: files = [] } = useQuery<BrandIdentityFileData[]>({
     queryKey: ["/api/clients", clientId, "brand-identity"],
@@ -1441,7 +1442,7 @@ interface CustomLinkItem {
 function LinkPageSection({ clientId, client }: { clientId: number; client?: Client }) {
   const { toast } = useToast();
   const { user } = useAuth();
-  const isEditor = user?.role === "admin" || user?.role === "designer";
+  const isEditor = isInternalRole(user?.role || "");
   const canEditLinkPage = isEditor || user?.role === "client";
   const [editing, setEditing] = useState(false);
   const [copied, setCopied] = useState(false);

@@ -3,7 +3,7 @@ import type { Server } from "http";
 import { randomUUID } from "crypto";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
-import { loginSchema, registerSchema, DEFAULT_KANBAN_COLUMNS, TIMED_COLUMNS, MANDATORY_FIRST_COLUMN, APPROVAL_STATUS_TO_COLUMN, PROTECTED_KANBAN_COLUMNS, insertClientProductSchema, insertClientServiceSchema, insertClientCredentialSchema, insertClientInsightSchema } from "@shared/schema";
+import { loginSchema, registerSchema, DEFAULT_KANBAN_COLUMNS, TIMED_COLUMNS, MANDATORY_FIRST_COLUMN, APPROVAL_STATUS_TO_COLUMN, PROTECTED_KANBAN_COLUMNS, insertClientProductSchema, insertClientServiceSchema, insertClientCredentialSchema, insertClientInsightSchema, isInternalRole, INTERNAL_ROLES } from "@shared/schema";
 import { z } from "zod";
 import { hashPassword, verifyPassword, requireAuth, requireRole, getCurrentUser } from "./auth";
 import { registerLocalStorageRoutes } from "./local-storage";
@@ -181,7 +181,7 @@ export async function registerRoutes(
   app.get("/api/users", requireAuth, async (req, res) => {
     const user = await getCurrentUser(req);
     if (!user) return res.status(401).json({ message: "Não autenticado" });
-    if (user.role !== "admin" && user.role !== "designer" && !user.isManager) {
+    if (!isInternalRole(user.role) && !user.isManager) {
       return res.status(403).json({ message: "Sem permissão" });
     }
     const allUsers = await storage.getUsers();
@@ -415,7 +415,7 @@ export async function registerRoutes(
     res.json(post);
   });
 
-  app.post(api.posts.create.path, requireRole("admin", "designer"), async (req, res) => {
+  app.post(api.posts.create.path, requireRole(...INTERNAL_ROLES), async (req, res) => {
     try {
       if (req.body.platform && typeof req.body.platform === 'string') {
         req.body.platform = [req.body.platform];
@@ -434,7 +434,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put(api.posts.update.path, requireRole("admin", "designer"), async (req, res) => {
+  app.put(api.posts.update.path, requireRole(...INTERNAL_ROLES), async (req, res) => {
     try {
       const id = Number(req.params.id);
       const existingPost = await storage.getPost(id);
@@ -537,7 +537,7 @@ export async function registerRoutes(
     let approvals;
     if (user.role === "client" && user.clientId) {
       approvals = await storage.getApprovalPostsByClient(user.clientId);
-    } else if (user.role === "designer") {
+    } else if (isInternalRole(user.role) && user.role !== "admin") {
       approvals = await storage.getApprovalPostsByDesigner(user.id);
     } else {
       approvals = await storage.getApprovalPosts();
@@ -558,13 +558,13 @@ export async function registerRoutes(
     res.json(stats);
   });
 
-  app.get("/api/approvals/approved", requireRole("admin", "designer"), async (_req, res) => {
+  app.get("/api/approvals/approved", requireRole(...INTERNAL_ROLES), async (_req, res) => {
     const allApprovals = await storage.getApprovalPosts();
     const approved = allApprovals.filter(a => a.status === "Aprovado");
     res.json(approved);
   });
 
-  app.get("/api/kanban/approved-cards", requireRole("admin", "designer"), async (_req, res) => {
+  app.get("/api/kanban/approved-cards", requireRole(...INTERNAL_ROLES), async (_req, res) => {
     try {
       const allCards = await storage.getApprovedKanbanCards();
       const allClients = await storage.getClients();
@@ -620,11 +620,11 @@ export async function registerRoutes(
     res.json(approval);
   });
 
-  app.post(api.approvals.create.path, requireRole("admin", "designer"), async (req, res) => {
+  app.post(api.approvals.create.path, requireRole(...INTERNAL_ROLES), async (req, res) => {
     try {
       const user = await getCurrentUser(req);
       const body = { ...req.body };
-      if (user && user.role === "designer") {
+      if (user && isInternalRole(user.role) && user.role !== "admin") {
         body.designerId = user.id;
       }
       const input = api.approvals.create.input.parse(body);
@@ -801,7 +801,7 @@ export async function registerRoutes(
 
   // === IMPORT APPROVED POSTS TO SCHEDULING ===
 
-  app.post("/api/posts/import-approval", requireRole("admin", "designer"), async (req, res) => {
+  app.post("/api/posts/import-approval", requireRole(...INTERNAL_ROLES), async (req, res) => {
     try {
       const importSchema = z.object({
         approvalPostId: z.number({ required_error: "ID da aprovação é obrigatório" }),
@@ -860,7 +860,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/posts/import-kanban-card", requireRole("admin", "designer"), async (req, res) => {
+  app.post("/api/posts/import-kanban-card", requireRole(...INTERNAL_ROLES), async (req, res) => {
     try {
       const importSchema = z.object({
         kanbanCardId: z.number({ required_error: "ID do card é obrigatório" }),
@@ -944,8 +944,7 @@ export async function registerRoutes(
     const allNotifications = await storage.getNotifications();
     const filtered = allNotifications.filter(n => {
       if (n.recipientUserId === user.id) return true;
-      if (user.role === "admin" && (!n.recipientRole || n.recipientRole === "admin" || n.recipientRole === "all")) return true;
-      if (user.role === "designer" && n.recipientRole === "designer") return true;
+      if (isInternalRole(user.role) && (!n.recipientRole || n.recipientRole === "admin" || n.recipientRole === "designer" || n.recipientRole === "all")) return true;
       if (user.role === "client" && n.recipientRole === "client" && n.clientId && user.clientId === n.clientId) return true;
       if (n.recipientRole === "all") return true;
       return false;
@@ -960,8 +959,7 @@ export async function registerRoutes(
     const filtered = allNotifications.filter(n => {
       if (n.isRead) return false;
       if (n.recipientUserId === user.id) return true;
-      if (user.role === "admin" && (!n.recipientRole || n.recipientRole === "admin" || n.recipientRole === "all")) return true;
-      if (user.role === "designer" && n.recipientRole === "designer") return true;
+      if (isInternalRole(user.role) && (!n.recipientRole || n.recipientRole === "admin" || n.recipientRole === "designer" || n.recipientRole === "all")) return true;
       if (user.role === "client" && n.recipientRole === "client" && n.clientId && user.clientId === n.clientId) return true;
       if (n.recipientRole === "all") return true;
       return false;
@@ -1020,7 +1018,7 @@ export async function registerRoutes(
     res.json(comps);
   });
 
-  app.post("/api/competitors", requireRole("admin", "designer"), async (req, res) => {
+  app.post("/api/competitors", requireRole(...INTERNAL_ROLES), async (req, res) => {
     try {
       const comp = await storage.createCompetitor(req.body);
       res.status(201).json(comp);
@@ -1029,12 +1027,12 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/competitors/:id", requireRole("admin", "designer"), async (req, res) => {
+  app.put("/api/competitors/:id", requireRole(...INTERNAL_ROLES), async (req, res) => {
     const comp = await storage.updateCompetitor(Number(req.params.id), req.body);
     res.json(comp);
   });
 
-  app.delete("/api/competitors/:id", requireRole("admin", "designer"), async (req, res) => {
+  app.delete("/api/competitors/:id", requireRole(...INTERNAL_ROLES), async (req, res) => {
     await storage.deleteCompetitor(Number(req.params.id));
     res.status(204).send();
   });
@@ -1253,7 +1251,7 @@ export async function registerRoutes(
     res.status(201).json(link);
   });
 
-  app.put("/api/custom-links/:id", requireAuth, requireRole(["admin", "designer"]), async (req, res) => {
+  app.put("/api/custom-links/:id", requireAuth, requireRole(...INTERNAL_ROLES), async (req, res) => {
     const id = Number(req.params.id);
     const { name, url, icon, position } = req.body;
     const updates: any = {};
@@ -1268,7 +1266,7 @@ export async function registerRoutes(
   app.delete("/api/custom-links/:id", requireAuth, async (req, res) => {
     const user = await getCurrentUser(req);
     if (!user) return res.status(401).json({ message: "Não autenticado" });
-    if (user.role === "admin" || user.role === "designer") {
+    if (isInternalRole(user.role)) {
       await storage.deleteClientCustomLink(Number(req.params.id));
       return res.json({ success: true });
     }
@@ -1382,7 +1380,7 @@ export async function registerRoutes(
     res.json(briefing);
   });
 
-  app.post("/api/briefings", requireRole("admin", "designer"), async (req, res) => {
+  app.post("/api/briefings", requireRole(...INTERNAL_ROLES), async (req, res) => {
     try {
       const { clientId, clientName, title, briefingType, templateId } = req.body;
       const user = await getCurrentUser(req);
@@ -1405,7 +1403,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/briefings/:id", requireRole("admin", "designer"), async (req, res) => {
+  app.put("/api/briefings/:id", requireRole(...INTERNAL_ROLES), async (req, res) => {
     const id = parseInt(String(req.params.id));
     if (isNaN(id)) return res.status(400).json({ message: "ID inválido" });
     try {
@@ -1417,7 +1415,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/briefings/:id", requireRole("admin", "designer"), async (req, res) => {
+  app.delete("/api/briefings/:id", requireRole(...INTERNAL_ROLES), async (req, res) => {
     const id = parseInt(String(req.params.id));
     if (isNaN(id)) return res.status(400).json({ message: "ID inválido" });
     await storage.deleteBriefing(id);
@@ -1436,7 +1434,7 @@ export async function registerRoutes(
     res.json(template);
   });
 
-  app.post("/api/briefing-templates", requireRole("admin", "designer"), async (req, res) => {
+  app.post("/api/briefing-templates", requireRole(...INTERNAL_ROLES), async (req, res) => {
     try {
       const user = await getCurrentUser(req);
       const template = await storage.createBriefingTemplate({
@@ -1452,7 +1450,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/briefing-templates/:id", requireRole("admin", "designer"), async (req, res) => {
+  app.put("/api/briefing-templates/:id", requireRole(...INTERNAL_ROLES), async (req, res) => {
     const id = Number(req.params.id);
     try {
       const template = await storage.updateBriefingTemplate(id, req.body);
@@ -1463,7 +1461,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/briefing-templates/:id", requireRole("admin", "designer"), async (req, res) => {
+  app.delete("/api/briefing-templates/:id", requireRole(...INTERNAL_ROLES), async (req, res) => {
     const id = Number(req.params.id);
     await storage.deleteBriefingTemplate(id);
     res.json({ success: true });
@@ -1857,14 +1855,14 @@ export async function registerRoutes(
     res.json(columns);
   });
 
-  app.post("/api/kanban/:clientId/columns", requireRole("admin", "designer"), async (req, res) => {
+  app.post("/api/kanban/:clientId/columns", requireRole(...INTERNAL_ROLES), async (req, res) => {
     const clientId = Number(req.params.clientId);
     const { title, position } = req.body;
     const col = await storage.createKanbanColumn({ clientId, title, position: position ?? 999 });
     res.json(col);
   });
 
-  app.put("/api/kanban/columns/:id", requireRole("admin", "designer"), async (req, res) => {
+  app.put("/api/kanban/columns/:id", requireRole(...INTERNAL_ROLES), async (req, res) => {
     const colId = Number(req.params.id);
     const existingCol = await storage.getKanbanColumn(colId);
     if (existingCol && PROTECTED_KANBAN_COLUMNS.includes(existingCol.title) && req.body.title && req.body.title !== existingCol.title) {
@@ -1874,7 +1872,7 @@ export async function registerRoutes(
     res.json(col);
   });
 
-  app.delete("/api/kanban/columns/:id", requireRole("admin", "designer"), async (req, res) => {
+  app.delete("/api/kanban/columns/:id", requireRole(...INTERNAL_ROLES), async (req, res) => {
     const colId = Number(req.params.id);
     const colToDelete = await storage.getKanbanColumn(colId);
     if (colToDelete && PROTECTED_KANBAN_COLUMNS.includes(colToDelete.title)) {
@@ -1884,7 +1882,7 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
-  app.put("/api/kanban/:clientId/columns/reorder", requireRole("admin", "designer"), async (req, res) => {
+  app.put("/api/kanban/:clientId/columns/reorder", requireRole(...INTERNAL_ROLES), async (req, res) => {
     const { columnIds } = req.body;
     await storage.reorderKanbanColumns(Number(req.params.clientId), columnIds);
     res.json({ success: true });
@@ -1910,7 +1908,7 @@ export async function registerRoutes(
       const clientId = user.clientId;
       if (!clientId) return res.status(400).json({ message: "Cliente não identificado" });
       allCards = await storage.getKanbanCardsByClient(clientId);
-    } else if (user.role === "admin" || user.role === "designer") {
+    } else if (isInternalRole(user.role)) {
       if (req.query.clientId) {
         allCards = await storage.getKanbanCardsByClient(Number(req.query.clientId));
       } else {
@@ -1988,7 +1986,7 @@ export async function registerRoutes(
     res.json(card);
   });
 
-  app.delete("/api/kanban/cards/:id", requireRole("admin", "designer"), async (req, res) => {
+  app.delete("/api/kanban/cards/:id", requireRole(...INTERNAL_ROLES), async (req, res) => {
     await storage.deleteKanbanCard(Number(req.params.id));
     res.json({ success: true });
   });
@@ -2118,7 +2116,7 @@ export async function registerRoutes(
     return updated;
   }
 
-  app.post("/api/kanban/cards/:id/send-approval", requireRole("admin", "designer"), async (req, res) => {
+  app.post("/api/kanban/cards/:id/send-approval", requireRole(...INTERNAL_ROLES), async (req, res) => {
     const cardId = Number(req.params.id);
     const card = await storage.getKanbanCard(cardId);
     if (!card) return res.status(404).json({ message: "Cartão não encontrado" });
@@ -2547,10 +2545,10 @@ export async function registerRoutes(
     res.json(entries);
   });
 
-  app.get("/api/kanban/reports/designer", requireRole("admin", "designer"), async (req, res) => {
+  app.get("/api/kanban/reports/designer", requireRole(...INTERNAL_ROLES), async (req, res) => {
     try {
       const allUsers = await storage.getUsers();
-      const designers = allUsers.filter(u => u.role === "designer" || u.role === "admin");
+      const designers = allUsers.filter(u => isInternalRole(u.role));
       const clientsList = await storage.getClients();
 
       const report = [];
@@ -2598,7 +2596,7 @@ export async function registerRoutes(
   async function checkOnboardingAccess(req: any, clientId: number): Promise<boolean> {
     const user = await getCurrentUser(req);
     if (!user) return false;
-    if (user.role === "admin" || user.role === "designer") return true;
+    if (isInternalRole(user.role)) return true;
     if (user.role === "client" && user.clientId === clientId) return true;
     return false;
   }
@@ -2616,11 +2614,11 @@ export async function registerRoutes(
     const product = await storage.createClientProduct(parsed);
     res.json(product);
   });
-  app.put("/api/onboarding/products/:id", requireAuth, requireRole(["admin", "designer"]), async (req, res) => {
+  app.put("/api/onboarding/products/:id", requireAuth, requireRole(...INTERNAL_ROLES), async (req, res) => {
     const product = await storage.updateClientProduct(Number(req.params.id), req.body);
     res.json(product);
   });
-  app.delete("/api/onboarding/products/:id", requireAuth, requireRole(["admin", "designer"]), async (req, res) => {
+  app.delete("/api/onboarding/products/:id", requireAuth, requireRole(...INTERNAL_ROLES), async (req, res) => {
     await storage.deleteClientProduct(Number(req.params.id));
     res.json({ success: true });
   });
@@ -2638,11 +2636,11 @@ export async function registerRoutes(
     const service = await storage.createClientService(parsed);
     res.json(service);
   });
-  app.put("/api/onboarding/services/:id", requireAuth, requireRole(["admin", "designer"]), async (req, res) => {
+  app.put("/api/onboarding/services/:id", requireAuth, requireRole(...INTERNAL_ROLES), async (req, res) => {
     const service = await storage.updateClientService(Number(req.params.id), req.body);
     res.json(service);
   });
-  app.delete("/api/onboarding/services/:id", requireAuth, requireRole(["admin", "designer"]), async (req, res) => {
+  app.delete("/api/onboarding/services/:id", requireAuth, requireRole(...INTERNAL_ROLES), async (req, res) => {
     await storage.deleteClientService(Number(req.params.id));
     res.json({ success: true });
   });
@@ -2660,11 +2658,11 @@ export async function registerRoutes(
     const cred = await storage.createClientCredential(parsed);
     res.json(cred);
   });
-  app.put("/api/onboarding/credentials/:id", requireAuth, requireRole(["admin", "designer"]), async (req, res) => {
+  app.put("/api/onboarding/credentials/:id", requireAuth, requireRole(...INTERNAL_ROLES), async (req, res) => {
     const cred = await storage.updateClientCredential(Number(req.params.id), req.body);
     res.json(cred);
   });
-  app.delete("/api/onboarding/credentials/:id", requireAuth, requireRole(["admin", "designer"]), async (req, res) => {
+  app.delete("/api/onboarding/credentials/:id", requireAuth, requireRole(...INTERNAL_ROLES), async (req, res) => {
     await storage.deleteClientCredential(Number(req.params.id));
     res.json({ success: true });
   });
@@ -2719,7 +2717,7 @@ export async function registerRoutes(
     const user = await getCurrentUser(req);
     if (!user) return res.status(401).json({ message: "Não autenticado" });
     const insightId = Number(req.params.id);
-    if (user.role === "admin" || user.role === "designer") {
+    if (isInternalRole(user.role)) {
       await storage.deleteClientInsight(insightId);
       return res.json({ success: true });
     }
@@ -2816,7 +2814,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/clients/:id/kanban-bg", requireRole("admin", "designer"), async (req, res) => {
+  app.put("/api/clients/:id/kanban-bg", requireRole(...INTERNAL_ROLES), async (req, res) => {
     const clientId = Number(req.params.id);
     const { kanbanBgColor, kanbanBgImage } = req.body;
     const updated = await storage.updateClient(clientId, {
@@ -2913,7 +2911,7 @@ export async function registerRoutes(
   registerLocalStorageRoutes(app);
 
   // === WORKFLOW REPORTS ===
-  app.get("/api/reports/workflow", requireAuth, requireRole("admin", "designer"), async (req, res) => {
+  app.get("/api/reports/workflow", requireAuth, requireRole(...INTERNAL_ROLES), async (req, res) => {
     try {
       const { clientId, cardType, assignedUserId, startDate, endDate } = req.query;
       const data = await storage.getWorkflowReportData({
@@ -2930,7 +2928,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/reports/movements", requireAuth, requireRole("admin", "designer"), async (req, res) => {
+  app.get("/api/reports/movements", requireAuth, requireRole(...INTERNAL_ROLES), async (req, res) => {
     try {
       const { clientId, userId, startDate, endDate } = req.query;
       const data = await storage.getMovementReportData({
@@ -2974,7 +2972,7 @@ export async function registerRoutes(
         clientIds = [user.clientId];
       } else if (targetClientId) {
         clientIds = [targetClientId];
-      } else if (user.role === "admin" || user.role === "designer") {
+      } else if (isInternalRole(user.role)) {
         const allClients = await storage.getClients();
         clientIds = allClients.map(c => c.id);
       }
@@ -3077,7 +3075,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/clients/:clientId/brand-identity", requireAuth, requireRole("admin", "designer", "client"), upload.single("file"), async (req, res) => {
+  app.post("/api/clients/:clientId/brand-identity", requireAuth, requireRole(...INTERNAL_ROLES, "client"), upload.single("file"), async (req, res) => {
     try {
       const clientId = Number(req.params.clientId);
       const file = req.file;
@@ -3113,7 +3111,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/brand-identity/:id", requireAuth, requireRole("admin", "designer"), async (req, res) => {
+  app.delete("/api/brand-identity/:id", requireAuth, requireRole(...INTERNAL_ROLES), async (req, res) => {
     try {
       const fileRecord = await storage.getBrandIdentityFile(Number(req.params.id));
       if (!fileRecord) return res.status(404).json({ message: "Arquivo não encontrado" });

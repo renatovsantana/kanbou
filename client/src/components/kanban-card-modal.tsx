@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import type { KanbanCard, KanbanComment, KanbanActivity, KanbanTimeEntry } from "@shared/schema";
 import type { User } from "@shared/schema";
-import { CARD_TYPE_LABELS, CARD_TYPE_COLORS, CARD_TYPE_FIELDS, type CardType } from "@shared/schema";
+import { CARD_TYPE_LABELS, CARD_TYPE_COLORS, CARD_TYPE_FIELDS, type CardType, isInternalRole } from "@shared/schema";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1197,7 +1197,7 @@ export function KanbanCardModal({ cardId, clientId, open, onClose }: KanbanCardM
                   {isUploading ? "Enviando..." : "Anexos"}
                 </Button>
 
-                {(currentUser?.role === "admin" || currentUser?.role === "designer") && !card?.approvalPostId && (!card?.approvalStatus || card?.approvalStatus === "Revisão") && (
+                {isInternalRole(currentUser?.role || "") && !card?.approvalPostId && (!card?.approvalStatus || card?.approvalStatus === "Revisão") && (
                   <Button
                     variant="secondary"
                     className="w-full justify-start text-xs"
@@ -1210,7 +1210,7 @@ export function KanbanCardModal({ cardId, clientId, open, onClose }: KanbanCardM
                   </Button>
                 )}
 
-                {currentUser?.role !== "client" && (
+                {isInternalRole(currentUser?.role || "") && (
                   <Button
                     variant="secondary"
                     className="w-full justify-start text-destructive"

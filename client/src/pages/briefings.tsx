@@ -16,6 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { FileText, Plus, Eye, Trash2, Clock, CheckCircle2, Copy, ExternalLink, Download, Loader2, Settings2, GripVertical, X } from "lucide-react";
 import type { Briefing, Client, BriefingTemplate, BriefingTemplateQuestion } from "@shared/schema";
+import { isInternalRole } from "@shared/schema";
 
 export type QuestionType = "text" | "select" | "multi-select" | "color-picker" | "radio" | "image-upload" | "file-upload";
 
@@ -197,12 +198,12 @@ export default function BriefingsPage() {
 
   const { data: clientsList = [] } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
-    enabled: role === "admin" || role === "designer",
+    enabled: isInternalRole(role),
   });
 
   const { data: templatesList = [] } = useQuery<BriefingTemplate[]>({
     queryKey: ["/api/briefing-templates"],
-    enabled: role === "admin" || role === "designer",
+    enabled: isInternalRole(role),
   });
 
   const createMutation = useMutation({
@@ -431,7 +432,7 @@ export default function BriefingsPage() {
           <CardContent className="flex flex-col items-center justify-center py-16">
             <FileText className="w-12 h-12 text-muted-foreground/30 mb-4" />
             <p className="text-muted-foreground text-sm">Nenhum briefing criado ainda</p>
-            {(role === "admin" || role === "designer") && (
+            {isInternalRole(role) && (
               <p className="text-muted-foreground/60 text-xs mt-1">
                 Clique em "Novo Briefing" para começar
               </p>
@@ -510,7 +511,7 @@ export default function BriefingsPage() {
                     </Button>
                   </>
                 )}
-                {(role === "admin" || role === "designer") && (
+                {isInternalRole(role) && (
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button variant="ghost" size="icon" data-testid={`button-delete-briefing-${briefing.id}`}>
@@ -550,7 +551,7 @@ export default function BriefingsPage() {
             Gerencie briefings e templates personalizados
           </p>
         </div>
-        {(role === "admin" || role === "designer") && (
+        {isInternalRole(role) && (
           <Button onClick={() => setCreateOpen(true)} data-testid="button-create-briefing">
             <Plus className="w-4 h-4 mr-2" />
             Novo Briefing
@@ -558,7 +559,7 @@ export default function BriefingsPage() {
         )}
       </div>
 
-      {(role === "admin" || role === "designer") ? (
+      {isInternalRole(role) ? (
         <Tabs defaultValue="briefings" className="w-full">
           <TabsList className="mb-6" data-testid="tabs-briefings">
             <TabsTrigger value="briefings" data-testid="tab-briefings">Briefings</TabsTrigger>

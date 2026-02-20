@@ -350,9 +350,32 @@ export const AVAILABLE_PERMISSIONS = [
   { key: "users_manage", label: "Gerenciar Usuários", description: "Criar, editar e excluir usuários" },
 ] as const;
 
+export const ALL_ROLES = ["admin", "designer", "redator", "gerente", "audiovisual", "atendimento", "client"] as const;
+export type UserRole = (typeof ALL_ROLES)[number];
+
+export const INTERNAL_ROLES: UserRole[] = ["admin", "designer", "redator", "gerente", "audiovisual", "atendimento"];
+
+export const ROLE_LABELS: Record<string, string> = {
+  admin: "Administrador",
+  designer: "Designer",
+  redator: "Redator",
+  gerente: "Gerente",
+  audiovisual: "Audiovisual",
+  atendimento: "Atendimento",
+  client: "Cliente",
+};
+
+export function isInternalRole(role: string): boolean {
+  return INTERNAL_ROLES.includes(role as UserRole);
+}
+
 export const DEFAULT_PERMISSIONS: Record<string, string[]> = {
   admin: AVAILABLE_PERMISSIONS.map(p => p.key),
   designer: ["dashboard", "posts_view", "posts_create", "posts_edit", "calendar", "approvals_view", "approvals_create", "approvals_edit", "briefings_view", "briefings_manage"],
+  redator: ["dashboard", "posts_view", "posts_create", "posts_edit", "calendar", "approvals_view", "approvals_create", "approvals_edit", "briefings_view", "briefings_manage"],
+  gerente: ["dashboard", "posts_view", "posts_create", "posts_edit", "calendar", "approvals_view", "approvals_create", "approvals_edit", "briefings_view", "briefings_manage", "clients_view", "clients_manage"],
+  audiovisual: ["dashboard", "posts_view", "posts_create", "posts_edit", "calendar", "approvals_view", "approvals_create", "approvals_edit", "briefings_view"],
+  atendimento: ["dashboard", "posts_view", "posts_create", "posts_edit", "calendar", "approvals_view", "approvals_create", "approvals_edit", "briefings_view", "briefings_manage", "clients_view"],
   client: ["dashboard", "approvals_view", "briefings_view"],
 };
 
@@ -360,7 +383,7 @@ export const registerSchema = z.object({
   name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
   email: z.string().email("Email inválido"),
   password: z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
-  role: z.enum(["admin", "designer", "client"]),
+  role: z.enum(ALL_ROLES),
   clientId: z.number().nullable().optional(),
   permissions: z.array(z.string()).nullable().optional(),
   isManager: z.boolean().optional(),

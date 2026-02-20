@@ -46,6 +46,7 @@ import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Client, Notification } from "@shared/schema";
+import { isInternalRole } from "@shared/schema";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -229,7 +230,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   const { data: clientsList = [] } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
-    enabled: role === "admin" || role === "designer",
+    enabled: isInternalRole(role),
   });
 
   const { data: notifications = [] } = useQuery<Notification[]>({
@@ -345,7 +346,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   const KanbanSection = () => {
     const isKanbanActive = location === "/kanban" || location.startsWith("/kanban");
-    const showClientTree = role === "admin" || role === "designer";
+    const showClientTree = isInternalRole(role);
 
     if (!showClientTree) {
       return <NavSection label="Tarefas" items={kanbanNav} />;
@@ -416,7 +417,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   const InsightsSection = () => {
     const isInsightsActive = location === "/insights" || location.startsWith("/insights");
-    const showClientTree = role === "admin" || role === "designer";
+    const showClientTree = isInternalRole(role);
 
     if (!showClientTree) {
       return (
@@ -531,25 +532,25 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </div>
 
       <div className="px-3 flex-1 overflow-y-auto">
-        {(role === "admin" || role === "designer") && (
+        {isInternalRole(role) && (
           <NavSection label="Geral" items={dashboardNav} />
         )}
 
-        {(role === "admin" || role === "designer") && (
+        {isInternalRole(role) && (
           <KanbanSection />
         )}
 
         <PostsSection />
 
-        {(role === "admin" || role === "designer") && (
+        {isInternalRole(role) && (
           <NavSection label="Briefing" items={briefingNav} />
         )}
 
-        {(role === "admin" || role === "designer") && (
+        {isInternalRole(role) && (
           <InsightsSection />
         )}
 
-        {(role === "admin" || role === "designer" || role === "client") && (
+        {(isInternalRole(role) || role === "client") && (
           <NavSection label="Onboarding" items={[
             { name: "Onboarding", href: "/onboarding", icon: ClipboardCheck },
           ]} />

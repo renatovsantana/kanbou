@@ -31,7 +31,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { Plus, UserCog, Loader2, Edit, Trash2 } from "lucide-react";
 import type { Client } from "@shared/schema";
-import { AVAILABLE_PERMISSIONS, DEFAULT_PERMISSIONS } from "@shared/schema";
+import { AVAILABLE_PERMISSIONS, DEFAULT_PERMISSIONS, ROLE_LABELS, ALL_ROLES, isInternalRole } from "@shared/schema";
 
 type SafeUser = {
   id: number;
@@ -238,13 +238,21 @@ export default function UsersPage() {
   const roleBadge = (role: string) => {
     switch (role) {
       case "admin":
-        return <Badge variant="default" className="no-default-hover-elevate no-default-active-elevate" data-testid={`badge-role-admin`}>Admin</Badge>;
+        return <Badge variant="default" className="no-default-hover-elevate no-default-active-elevate" data-testid={`badge-role-admin`}>Administrador</Badge>;
       case "designer":
         return <Badge variant="secondary" className="no-default-hover-elevate no-default-active-elevate" data-testid={`badge-role-designer`}>Designer</Badge>;
+      case "redator":
+        return <Badge variant="outline" className="no-default-hover-elevate no-default-active-elevate border-amber-500/50 text-amber-700 dark:text-amber-400" data-testid={`badge-role-redator`}>Redator</Badge>;
+      case "gerente":
+        return <Badge variant="default" className="no-default-hover-elevate no-default-active-elevate" data-testid={`badge-role-gerente`}>Gerente</Badge>;
+      case "audiovisual":
+        return <Badge variant="secondary" className="no-default-hover-elevate no-default-active-elevate" data-testid={`badge-role-audiovisual`}>Audiovisual</Badge>;
+      case "atendimento":
+        return <Badge variant="secondary" className="no-default-hover-elevate no-default-active-elevate" data-testid={`badge-role-atendimento`}>Atendimento</Badge>;
       case "client":
         return <Badge variant="outline" className="no-default-hover-elevate no-default-active-elevate" data-testid={`badge-role-client`}>Cliente</Badge>;
       default:
-        return <Badge variant="outline" className="no-default-hover-elevate no-default-active-elevate">{role}</Badge>;
+        return <Badge variant="outline" className="no-default-hover-elevate no-default-active-elevate">{ROLE_LABELS[role] || role}</Badge>;
     }
   };
 
@@ -325,9 +333,9 @@ export default function UsersPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="admin">Administrador</SelectItem>
-                        <SelectItem value="designer">Designer</SelectItem>
-                        <SelectItem value="client">Cliente</SelectItem>
+                        {ALL_ROLES.map((r) => (
+                          <SelectItem key={r} value={r}>{ROLE_LABELS[r] || r}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
