@@ -53,7 +53,10 @@ export default function InsightsPage() {
   const { user } = useAuth();
   const searchString = useSearch();
   const urlParams = new URLSearchParams(searchString);
-  const initialClientId = urlParams.get("clientId") || "all";
+  const urlClientId = urlParams.get("clientId");
+  const isClient = user?.role === "client";
+  const clientAutoId = isClient && user?.clientId ? String(user.clientId) : null;
+  const initialClientId = urlClientId || clientAutoId || "all";
   const [selectedClientId, setSelectedClientId] = useState<string>(initialClientId);
   const [message, setMessage] = useState("");
   const [insightToDelete, setInsightToDelete] = useState<number | null>(null);
@@ -124,20 +127,22 @@ export default function InsightsPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-muted-foreground" />
-          <Select value={selectedClientId} onValueChange={setSelectedClientId}>
-            <SelectTrigger className="w-[200px]" data-testid="select-insights-client">
-              <SelectValue placeholder="Filtrar por cliente" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os clientes</SelectItem>
-              {activeClients.map(c => (
-                <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {!isClient && (
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-muted-foreground" />
+            <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+              <SelectTrigger className="w-[200px]" data-testid="select-insights-client">
+                <SelectValue placeholder="Filtrar por cliente" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os clientes</SelectItem>
+                {activeClients.map(c => (
+                  <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
 
       {postClientId && (
