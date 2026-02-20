@@ -4,3 +4,33 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Uploads (user files)
+uploads/
+
+# Thumbnails
+server/thumbnails/
+
+# Logs
+*.log
+/var/log/
+
+# IDE
+.vscode/
+.idea/
+
+# OS files
+Thumbs.db
+
+# Replit specific
+.replit
+.cache/
+.config/
+.local/
+attached_assets/
+.upm/

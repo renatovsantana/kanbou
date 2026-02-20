@@ -3,7 +3,7 @@ import type { Server } from "http";
 import { randomUUID } from "crypto";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
-import { loginSchema, registerSchema, DEFAULT_KANBAN_COLUMNS, TIMED_COLUMNS, APPROVAL_STATUS_TO_COLUMN, PROTECTED_KANBAN_COLUMNS, insertClientProductSchema, insertClientServiceSchema, insertClientCredentialSchema, insertClientInsightSchema } from "@shared/schema";
+import { loginSchema, registerSchema, DEFAULT_KANBAN_COLUMNS, TIMED_COLUMNS, MANDATORY_FIRST_COLUMN, APPROVAL_STATUS_TO_COLUMN, PROTECTED_KANBAN_COLUMNS, insertClientProductSchema, insertClientServiceSchema, insertClientCredentialSchema, insertClientInsightSchema } from "@shared/schema";
 import { z } from "zod";
 import { hashPassword, verifyPassword, requireAuth, requireRole, getCurrentUser } from "./auth";
 import { registerLocalStorageRoutes } from "./local-storage";
@@ -1740,13 +1740,48 @@ export async function registerRoutes(
 
   app.post("/api/kanban/cards", requireAuth, async (req, res) => {
     const user = await getCurrentUser(req);
-    const card = await storage.createKanbanCard({ ...req.body, createdBy: user?.id });
+    const { clientId } = req.body;
+
+    if (!clientId) {
+      return res.status(400).json({ message: "Cliente é obrigatório" });
+    }
+
+    const columns = await storage.getKanbanColumnsByClient(clientId);
+    let filaColumn = columns.find(c => c.title === MANDATORY_FIRST_COLUMN);
+
+    if (!filaColumn) {
+      const maxPos = columns.length > 0 ? Math.max(...columns.map(c => c.position)) + 1 : 0;
+      filaColumn = await storage.createKanbanColumn({
+        clientId,
+        title: MANDATORY_FIRST_COLUMN,
+        position: 0,
+      });
+      for (const col of columns) {
+        await storage.updateKanbanColumn(col.id, { position: col.position + 1 });
+      }
+    }
+
+    const targetColumnId = filaColumn.id;
+    const colCards = await storage.getKanbanCardsByColumn(targetColumnId);
+    const maxPos = colCards.length > 0 ? Math.max(...colCards.map(c => c.position)) + 1 : 0;
+
+    const card = await storage.createKanbanCard({ 
+      ...req.body, 
+      columnId: targetColumnId,
+      position: maxPos,
+      createdBy: user?.id 
+    });
     await storage.createKanbanActivity({
       cardId: card.id,
       userId: user?.id ?? null,
       action: "created",
       details: `Cartão "${card.title}" criado`,
     });
+
+    if (TIMED_COLUMNS.includes(MANDATORY_FIRST_COLUMN) && user) {
+      await storage.startTimeEntry(card.id, user.id);
+    }
+
     res.json(card);
   });
 

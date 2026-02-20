@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { KanbanColumn, KanbanCard, Client } from "@shared/schema";
-import { CARD_TYPE_LABELS, CARD_TYPE_COLORS, PROTECTED_KANBAN_COLUMNS, type CardType } from "@shared/schema";
+import { CARD_TYPE_LABELS, CARD_TYPE_COLORS, PROTECTED_KANBAN_COLUMNS, MANDATORY_FIRST_COLUMN, type CardType } from "@shared/schema";
 import { KanbanCardModal } from "@/components/kanban-card-modal";
 import { KanbanCreateCardDialog } from "@/components/kanban-create-card-dialog";
 import {
@@ -453,17 +453,19 @@ function DroppableColumn({
           </SortableContext>
         </div>
 
-        <div className="px-2 pb-2">
-          <Button
-            variant="ghost"
-            className="w-full justify-start text-muted-foreground/70 text-sm"
-            onClick={() => setIsAdding(true)}
-            data-testid={`button-add-card-${column.id}`}
-          >
-            <Plus className="w-4 h-4 mr-1.5" />
-            Adicionar cartão
-          </Button>
-        </div>
+        {column.title === MANDATORY_FIRST_COLUMN && (
+          <div className="px-2 pb-2">
+            <Button
+              variant="ghost"
+              className="w-full justify-start text-muted-foreground/70 text-sm"
+              onClick={() => setIsAdding(true)}
+              data-testid={`button-add-card-${column.id}`}
+            >
+              <Plus className="w-4 h-4 mr-1.5" />
+              Adicionar cartão
+            </Button>
+          </div>
+        )}
         <KanbanCreateCardDialog
           open={isAdding}
           onClose={() => setIsAdding(false)}
