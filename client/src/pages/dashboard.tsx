@@ -119,7 +119,6 @@ export default function Dashboard() {
   const totalPosts = allPosts.length;
   const published = allPosts.filter(p => p.status === 'Publicado').length;
   const scheduled = allPosts.filter(p => p.status === 'Agendado').length;
-  const drafts = 0;
 
   const totalApprovals = approvals.length;
   const pendingApprovals = approvals.filter(a => a.status === "Pendente").length;
