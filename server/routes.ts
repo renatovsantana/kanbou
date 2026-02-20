@@ -1018,21 +1018,40 @@ export async function registerRoutes(
     res.json(comps);
   });
 
-  app.post("/api/competitors", requireRole(...INTERNAL_ROLES), async (req, res) => {
+  app.post("/api/competitors", requireRole(...INTERNAL_ROLES, "client"), async (req, res) => {
     try {
-      const comp = await storage.createCompetitor(req.body);
+      const user = await getCurrentUser(req);
+      const data = req.body;
+      if (user?.role === "client" && user.clientId) {
+        data.clientId = user.clientId;
+      }
+      const comp = await storage.createCompetitor(data);
       res.status(201).json(comp);
     } catch (error: any) {
       res.status(400).json({ message: error.message || "Erro ao criar concorrente" });
     }
   });
 
-  app.put("/api/competitors/:id", requireRole(...INTERNAL_ROLES), async (req, res) => {
+  app.put("/api/competitors/:id", requireRole(...INTERNAL_ROLES, "client"), async (req, res) => {
+    const user = await getCurrentUser(req);
+    if (user?.role === "client") {
+      const comp = await storage.getCompetitor(Number(req.params.id));
+      if (comp && comp.clientId !== user.clientId) {
+        return res.status(403).json({ message: "Sem permissão" });
+      }
+    }
     const comp = await storage.updateCompetitor(Number(req.params.id), req.body);
     res.json(comp);
   });
 
-  app.delete("/api/competitors/:id", requireRole(...INTERNAL_ROLES), async (req, res) => {
+  app.delete("/api/competitors/:id", requireRole(...INTERNAL_ROLES, "client"), async (req, res) => {
+    const user = await getCurrentUser(req);
+    if (user?.role === "client") {
+      const comp = await storage.getCompetitor(Number(req.params.id));
+      if (comp && comp.clientId !== user.clientId) {
+        return res.status(403).json({ message: "Sem permissão" });
+      }
+    }
     await storage.deleteCompetitor(Number(req.params.id));
     res.status(204).send();
   });

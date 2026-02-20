@@ -309,32 +309,13 @@ function TagsSection({ clientId, client }: { clientId: number; client?: Client }
   const [editing, setEditing] = useState(false);
   const [tags, setTags] = useState<string[]>(client?.tags || []);
   const [newTag, setNewTag] = useState("");
-  const [suggestions, setSuggestions] = useState<string[]>([]);
 
   const saveMutation = useMutation({
     mutationFn: () => apiRequest("PUT", `/api/clients/${clientId}/tags`, { tags }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       setEditing(false);
-      setSuggestions([]);
       toast({ title: "Tags salvas com sucesso" });
-    },
-  });
-
-  const suggestMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/clients/${clientId}/suggest-tags`);
-      return res.json();
-    },
-    onSuccess: (data: { suggestions: string[] }) => {
-      const newSuggestions = data.suggestions.filter(s => !tags.includes(s));
-      setSuggestions(newSuggestions);
-      if (newSuggestions.length === 0) {
-        toast({ title: "Nenhuma sugestão nova encontrada" });
-      }
-    },
-    onError: () => {
-      toast({ title: "Erro ao gerar sugestões", variant: "destructive" });
     },
   });
 
@@ -346,13 +327,6 @@ function TagsSection({ clientId, client }: { clientId: number; client?: Client }
     }
   };
 
-  const acceptSuggestion = (tag: string) => {
-    if (!tags.includes(tag)) {
-      setTags([...tags, tag]);
-    }
-    setSuggestions(suggestions.filter(s => s !== tag));
-  };
-
   return (
     <Card className="p-5" data-testid="section-tags">
       <div className="flex items-center justify-between gap-2 mb-3">
@@ -361,18 +335,6 @@ function TagsSection({ clientId, client }: { clientId: number; client?: Client }
           <h2 className="font-semibold">Tags & Hashtags</h2>
         </div>
         <div className="flex gap-1 flex-wrap">
-          {editing && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => suggestMutation.mutate()}
-              disabled={suggestMutation.isPending}
-              data-testid="button-suggest-tags"
-            >
-              {suggestMutation.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 mr-1" />}
-              Sugerir
-            </Button>
-          )}
           {!editing ? (
             <Button variant="ghost" size="sm" onClick={() => { setTags(client?.tags || []); setEditing(true); }} data-testid="button-edit-tags">
               Editar
@@ -382,7 +344,7 @@ function TagsSection({ clientId, client }: { clientId: number; client?: Client }
               <Button size="sm" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} data-testid="button-save-tags">
                 <Save className="w-3.5 h-3.5 mr-1" /> Salvar
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => { setEditing(false); setSuggestions([]); }}>
+              <Button variant="ghost" size="sm" onClick={() => { setEditing(false); }}>
                 <X className="w-3.5 h-3.5" />
               </Button>
             </>
@@ -413,24 +375,6 @@ function TagsSection({ clientId, client }: { clientId: number; client?: Client }
               </Badge>
             ))}
           </div>
-          {suggestions.length > 0 && (
-            <div className="space-y-1.5 pt-2 border-t">
-              <p className="text-xs text-muted-foreground font-medium">Sugestões de IA (clique para adicionar):</p>
-              <div className="flex flex-wrap gap-1.5">
-                {suggestions.map((tag, i) => (
-                  <Badge
-                    key={i}
-                    variant="outline"
-                    className="cursor-pointer border-primary/30 text-primary"
-                    onClick={() => acceptSuggestion(tag)}
-                    data-testid={`suggestion-tag-${i}`}
-                  >
-                    <Plus className="w-3 h-3 mr-0.5" /> #{tag}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       ) : (
         <div className="flex flex-wrap gap-1.5">
@@ -454,7 +398,6 @@ function MarketTagsSection({ clientId, client }: { clientId: number; client?: Cl
   const [editing, setEditing] = useState(false);
   const [tags, setTags] = useState<string[]>(client?.marketTags || []);
   const [newTag, setNewTag] = useState("");
-  const [suggestions, setSuggestions] = useState<string[]>([]);
 
   useEffect(() => {
     setTags(client?.marketTags || []);
@@ -465,25 +408,7 @@ function MarketTagsSection({ clientId, client }: { clientId: number; client?: Cl
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       setEditing(false);
-      setSuggestions([]);
       toast({ title: "Tags de mercado salvas" });
-    },
-  });
-
-  const suggestMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/clients/${clientId}/suggest-market-tags`);
-      return res.json();
-    },
-    onSuccess: (data: { suggestions: string[] }) => {
-      const newSuggestions = data.suggestions.filter(s => !tags.includes(s));
-      setSuggestions(newSuggestions);
-      if (newSuggestions.length === 0) {
-        toast({ title: "Nenhuma sugestão nova encontrada" });
-      }
-    },
-    onError: () => {
-      toast({ title: "Erro ao gerar sugestões", variant: "destructive" });
     },
   });
 
@@ -495,13 +420,6 @@ function MarketTagsSection({ clientId, client }: { clientId: number; client?: Cl
     }
   };
 
-  const acceptSuggestion = (tag: string) => {
-    if (!tags.includes(tag)) {
-      setTags([...tags, tag]);
-    }
-    setSuggestions(suggestions.filter(s => s !== tag));
-  };
-
   return (
     <Card className="p-5" data-testid="section-market-tags">
       <div className="flex items-center justify-between gap-2 mb-3">
@@ -510,18 +428,6 @@ function MarketTagsSection({ clientId, client }: { clientId: number; client?: Cl
           <h2 className="font-semibold">Palavras-chave de Mercado</h2>
         </div>
         <div className="flex gap-1 flex-wrap">
-          {editing && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => suggestMutation.mutate()}
-              disabled={suggestMutation.isPending}
-              data-testid="button-suggest-market-tags"
-            >
-              {suggestMutation.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 mr-1" />}
-              Sugerir
-            </Button>
-          )}
           {!editing ? (
             <Button variant="ghost" size="sm" onClick={() => { setTags(client?.marketTags || []); setEditing(true); }} data-testid="button-edit-market-tags">
               Editar
@@ -531,7 +437,7 @@ function MarketTagsSection({ clientId, client }: { clientId: number; client?: Cl
               <Button size="sm" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} data-testid="button-save-market-tags">
                 <Save className="w-3.5 h-3.5 mr-1" /> Salvar
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => { setEditing(false); setSuggestions([]); }}>
+              <Button variant="ghost" size="sm" onClick={() => { setEditing(false); }}>
                 <X className="w-3.5 h-3.5" />
               </Button>
             </>
@@ -565,24 +471,6 @@ function MarketTagsSection({ clientId, client }: { clientId: number; client?: Cl
               </Badge>
             ))}
           </div>
-          {suggestions.length > 0 && (
-            <div className="space-y-1.5 pt-2 border-t">
-              <p className="text-xs text-muted-foreground font-medium">Sugestões de IA (clique para adicionar):</p>
-              <div className="flex flex-wrap gap-1.5">
-                {suggestions.map((tag, i) => (
-                  <Badge
-                    key={i}
-                    variant="outline"
-                    className="cursor-pointer border-primary/30 text-primary"
-                    onClick={() => acceptSuggestion(tag)}
-                    data-testid={`suggestion-market-tag-${i}`}
-                  >
-                    <Plus className="w-3 h-3 mr-0.5" /> {tag}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       ) : (
         <div className="flex flex-wrap gap-1.5">
@@ -617,7 +505,7 @@ function CrudSection<T extends { id: number }>({
   clientId: number;
   baseUrl: string;
   queryKey: any[];
-  fields: { key: string; label: string; type: "text" | "textarea" }[];
+  fields: { key: string; label: string; type: "text" | "textarea" | "richtext" }[];
   renderItem: (item: T, onDelete: (id: number) => void, onEdit: (item: T) => void) => React.ReactNode;
 }) {
   const { toast } = useToast();
@@ -689,7 +577,13 @@ function CrudSection<T extends { id: number }>({
           {fields.map(f => (
             <div key={f.key}>
               <label className="text-xs font-medium text-muted-foreground">{f.label}</label>
-              {f.type === "textarea" ? (
+              {f.type === "richtext" ? (
+                <RichTextEditor
+                  content={formData[f.key] || ""}
+                  onChange={(val) => setFormData({ ...formData, [f.key]: val })}
+                  placeholder={f.label}
+                />
+              ) : f.type === "textarea" ? (
                 <Textarea
                   value={formData[f.key] || ""}
                   onChange={e => setFormData({ ...formData, [f.key]: e.target.value })}
@@ -739,13 +633,13 @@ function ProductsSection({ clientId, products }: { clientId: number; products: C
       queryKey={["/api/onboarding", clientId, "products"]}
       fields={[
         { key: "name", label: "Nome do Produto", type: "text" },
-        { key: "description", label: "Descrição", type: "textarea" },
+        { key: "description", label: "Descrição", type: "richtext" },
       ]}
       renderItem={(item, onDelete, onEdit) => (
         <div key={item.id} className="flex items-start gap-3 p-2.5 rounded-md bg-muted/20 group" data-testid={`product-${item.id}`}>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium">{item.name}</p>
-            {item.description && <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>}
+            {item.description && <RichTextDisplay content={item.description} />}
           </div>
           <div className="flex gap-1 shrink-0 invisible group-hover:visible">
             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(item)} data-testid={`button-edit-product-${item.id}`}>
@@ -772,13 +666,13 @@ function ServicesSection({ clientId, services }: { clientId: number; services: C
       queryKey={["/api/onboarding", clientId, "services"]}
       fields={[
         { key: "name", label: "Nome do Serviço", type: "text" },
-        { key: "description", label: "Descrição", type: "textarea" },
+        { key: "description", label: "Descrição", type: "richtext" },
       ]}
       renderItem={(item, onDelete, onEdit) => (
         <div key={item.id} className="flex items-start gap-3 p-2.5 rounded-md bg-muted/20 group" data-testid={`service-${item.id}`}>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium">{item.name}</p>
-            {item.description && <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>}
+            {item.description && <RichTextDisplay content={item.description} />}
           </div>
           <div className="flex gap-1 shrink-0 invisible group-hover:visible">
             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(item)} data-testid={`button-edit-service-${item.id}`}>
@@ -921,8 +815,6 @@ function CredentialsSection({ clientId, credentials }: { clientId: number; crede
 
 function CompetitorsSection({ clientId, competitors }: { clientId: number; competitors: Competitor[] }) {
   const { toast } = useToast();
-  const { user } = useAuth();
-  const isEditor = isInternalRole(user?.role || "");
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Competitor | null>(null);
   const [competitorToDelete, setCompetitorToDelete] = useState<number | null>(null);
@@ -989,7 +881,7 @@ function CompetitorsSection({ clientId, competitors }: { clientId: number; compe
           <h2 className="font-semibold">Concorrentes</h2>
           <Badge variant="secondary" className="text-xs no-default-hover-elevate no-default-active-elevate">{competitors.length}</Badge>
         </div>
-        {isEditor && !showForm && (
+        {!showForm && (
           <Button variant="outline" size="sm" onClick={() => setShowForm(true)} data-testid="button-add-competitor">
             <Plus className="w-3.5 h-3.5 mr-1" /> Adicionar
           </Button>
@@ -1090,16 +982,14 @@ function CompetitorsSection({ clientId, competitors }: { clientId: number; compe
                   </div>
                   {comp.notes && <p className="text-[10px] text-muted-foreground/60 mt-1">{comp.notes}</p>}
                 </div>
-                {isEditor && (
-                  <div className="flex items-center gap-0.5 invisible group-hover:visible">
-                    <Button variant="ghost" size="icon" onClick={() => startEdit(comp)} data-testid={`button-edit-competitor-${comp.id}`} title="Editar">
-                      <Pencil className="w-3.5 h-3.5" />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => setCompetitorToDelete(comp.id)} data-testid={`button-delete-competitor-${comp.id}`} title="Remover">
-                      <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                    </Button>
-                  </div>
-                )}
+                <div className="flex items-center gap-0.5 invisible group-hover:visible">
+                  <Button variant="ghost" size="icon" onClick={() => startEdit(comp)} data-testid={`button-edit-competitor-${comp.id}`} title="Editar">
+                    <Pencil className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={() => setCompetitorToDelete(comp.id)} data-testid={`button-delete-competitor-${comp.id}`} title="Remover">
+                    <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                  </Button>
+                </div>
               </div>
             </div>
           ))
