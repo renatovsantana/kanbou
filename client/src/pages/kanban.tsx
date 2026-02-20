@@ -301,10 +301,14 @@ function isCardOverdue(card: KanbanCard): boolean {
   try {
     const data = card.templateData ? JSON.parse(card.templateData) : null;
     if (!data?.publishDate) return false;
-    const publishDate = new Date(data.publishDate);
+    const parts = data.publishDate.split("T")[0].split("-");
+    const pubYear = parseInt(parts[0], 10);
+    const pubMonth = parseInt(parts[1], 10) - 1;
+    const pubDay = parseInt(parts[2], 10);
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return publishDate < today;
+    const todayLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const pubLocal = new Date(pubYear, pubMonth, pubDay);
+    return pubLocal < todayLocal;
   } catch {
     return false;
   }
