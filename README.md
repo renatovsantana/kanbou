@@ -1,1 +1,0 @@
-# Kanbou - Shift Agency Manager

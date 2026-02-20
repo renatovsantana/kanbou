@@ -1,0 +1,255 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-sans: 'Inter', sans-serif;
+  --font-display: 'Plus Jakarta Sans', sans-serif;
+
+  --background: 210 10% 96%;
+  --foreground: 220 15% 20%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 220 15% 20%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 220 15% 20%;
+
+  --primary: 142 50% 45%;
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 220 8% 93%;
+  --secondary-foreground: 220 12% 30%;
+
+  --muted: 220 8% 91%;
+  --muted-foreground: 220 8% 46%;
+
+  --accent: 142 50% 45%;
+  --accent-foreground: 0 0% 100%;
+
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+
+  --border: 220 10% 88%;
+  --input: 220 10% 88%;
+  --ring: 142 50% 45%;
+
+  --radius: 0.5rem;
+
+  --sidebar-bg: 220 15% 13%;
+  --sidebar-fg: 220 10% 92%;
+  --sidebar-muted: 220 12% 18%;
+  --sidebar-accent: 142 50% 45%;
+  --sidebar-border: 220 12% 18%;
+}
+
+.dark {
+  --background: 224 15% 10%;
+  --foreground: 220 10% 92%;
+
+  --card: 224 14% 13%;
+  --card-foreground: 220 10% 92%;
+
+  --popover: 224 14% 13%;
+  --popover-foreground: 220 10% 92%;
+
+  --primary: 142 50% 45%;
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 224 12% 18%;
+  --secondary-foreground: 220 10% 80%;
+
+  --muted: 224 10% 16%;
+  --muted-foreground: 220 8% 55%;
+
+  --accent: 142 50% 45%;
+  --accent-foreground: 0 0% 100%;
+
+  --destructive: 0 62% 50%;
+  --destructive-foreground: 0 0% 100%;
+
+  --border: 224 10% 18%;
+  --input: 224 10% 18%;
+  --ring: 142 50% 45%;
+
+  --sidebar-bg: 224 18% 8%;
+  --sidebar-fg: 220 10% 92%;
+  --sidebar-muted: 224 14% 14%;
+  --sidebar-accent: 142 50% 45%;
+  --sidebar-border: 224 14% 14%;
+}
+
+@layer base {
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-sans);
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    @apply tracking-tight font-bold text-foreground;
+  }
+}
+
+@layer components {
+  .sidebar-link {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 font-medium text-sm;
+    color: hsl(var(--sidebar-fg) / 0.55);
+  }
+
+  .sidebar-link:hover {
+    background: hsl(var(--sidebar-muted));
+    color: hsl(var(--sidebar-fg) / 0.9);
+  }
+
+  .sidebar-link.active {
+    background: hsl(var(--sidebar-accent) / 0.15);
+    color: hsl(var(--sidebar-accent));
+    font-weight: 600;
+  }
+
+  .sidebar-link.active .sidebar-link-icon {
+    color: hsl(var(--sidebar-accent));
+  }
+
+  .stat-card {
+    @apply flex flex-col gap-1 p-5 rounded-xl border transition-all;
+    background: hsl(var(--card));
+    border-color: hsl(var(--border));
+  }
+
+  .stat-card-accent {
+    background: hsl(var(--primary) / 0.1);
+    border-color: hsl(var(--primary) / 0.2);
+  }
+
+  .stat-pill {
+    @apply inline-flex items-center gap-2 px-5 py-2.5 rounded-full font-semibold text-sm;
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+  }
+
+  .page-header {
+    @apply flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 flex-wrap mb-8;
+  }
+
+  .section-title {
+    @apply text-2xl font-display font-bold text-foreground;
+  }
+
+  .section-subtitle {
+    @apply text-sm text-muted-foreground mt-1;
+  }
+
+  .kanban-board-bg {
+    background: linear-gradient(135deg, hsl(160 30% 18%) 0%, hsl(200 25% 14%) 50%, hsl(220 20% 12%) 100%);
+  }
+
+  .dark .kanban-board-bg {
+    background: linear-gradient(135deg, hsl(160 25% 10%) 0%, hsl(200 20% 8%) 50%, hsl(220 18% 6%) 100%);
+  }
+
+  .kanban-column {
+    background: hsl(var(--background) / 0.85);
+    backdrop-filter: blur(12px);
+    border: 1px solid hsl(var(--border) / 0.5);
+  }
+
+  .dark .kanban-column {
+    background: hsl(var(--background) / 0.6);
+    border-color: hsl(var(--border) / 0.3);
+  }
+
+  .kanban-scroll::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.1);
+  }
+
+  .kanban-scroll::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.2);
+  }
+}
+
+.kanban-top-scrollbar {
+  scrollbar-width: auto;
+}
+.kanban-top-scrollbar::-webkit-scrollbar {
+  height: 10px;
+}
+.kanban-top-scrollbar::-webkit-scrollbar-track {
+  background: hsl(var(--muted-foreground) / 0.05);
+  border-radius: 5px;
+}
+.kanban-top-scrollbar::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.25);
+  border-radius: 5px;
+}
+.kanban-top-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.4);
+}
+
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  @apply rounded-full;
+  background: hsl(var(--muted-foreground) / 0.15);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.25);
+}
+
+@media print {
+  body {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    background: white !important;
+    color: black !important;
+  }
+
+  .print\\:hidden,
+  [data-sidebar],
+  header,
+  nav,
+  .sidebar,
+  button,
+  [role="tablist"] {
+    display: none !important;
+  }
+
+  .flex-1.overflow-y-auto,
+  .flex-1.overflow-hidden,
+  main {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+
+  .flex.h-screen {
+    display: block !important;
+    height: auto !important;
+  }
+
+  [role="tabpanel"] {
+    display: block !important;
+    opacity: 1 !important;
+  }
+
+  [role="tabpanel"][data-state="inactive"] {
+    display: none !important;
+  }
+
+  .recharts-wrapper {
+    page-break-inside: avoid;
+  }
+
+  .max-w-7xl {
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+}
