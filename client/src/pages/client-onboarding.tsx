@@ -36,11 +36,9 @@ import {
   X,
   Eye,
   EyeOff,
-  Send,
   Package,
   Wrench,
   KeyRound,
-  Lightbulb,
   Users,
   Hash,
   Building2,
@@ -88,15 +86,6 @@ interface ClientCredential {
   notes: string | null;
   createdAt: string;
 }
-interface ClientInsight {
-  id: number;
-  clientId: number;
-  userId: number;
-  message: string;
-  userName: string;
-  createdAt: string;
-}
-
 const SOCIAL_PLATFORMS = [
   { value: "Instagram", icon: SiInstagram },
   { value: "Facebook", icon: SiFacebook },
@@ -152,10 +141,6 @@ export default function ClientOnboarding() {
     queryKey: ["/api/onboarding", clientId, "credentials"],
     enabled: !!clientId,
   });
-  const { data: insights = [] } = useQuery<ClientInsight[]>({
-    queryKey: ["/api/onboarding", clientId, "insights"],
-    enabled: !!clientId,
-  });
   const { data: competitors = [] } = useQuery<Competitor[]>({
     queryKey: ["/api/competitors"],
     enabled: !!clientId,
@@ -199,6 +184,7 @@ export default function ClientOnboarding() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           <div className="space-y-5">
             <AboutSection clientId={clientId} client={clientObj} />
+            <NotesSection clientId={clientId} client={clientObj} />
             <MarketTagsSection clientId={clientId} client={clientObj} />
             <TagsSection clientId={clientId} client={clientObj} />
             <ProductsSection clientId={clientId} products={products} />
@@ -208,7 +194,6 @@ export default function ClientOnboarding() {
             <LinkPageSection clientId={clientId} client={clientObj} />
             <CredentialsSection clientId={clientId} credentials={credentials} />
             <BrandIdentitySection clientId={clientId} />
-            <InsightsSection clientId={clientId} insights={insights} />
             <CompetitorsSection clientId={clientId} competitors={clientCompetitors} />
             {user?.role === "admin" && (
               <AccessSection clientId={clientId} users={users} accessUserIds={accessUserIds} />
@@ -263,6 +248,55 @@ function AboutSection({ clientId, client }: { clientId: number; client?: Client 
           <RichTextDisplay content={client.about} />
         ) : (
           <p className="text-sm text-muted-foreground">Nenhuma descrição adicionada ainda.</p>
+        )
+      )}
+    </Card>
+  );
+}
+
+function NotesSection({ clientId, client }: { clientId: number; client?: Client }) {
+  const { toast } = useToast();
+  const [editing, setEditing] = useState(false);
+  const [notes, setNotes] = useState(client?.notes || "");
+
+  const saveMutation = useMutation({
+    mutationFn: () => apiRequest("PUT", `/api/clients/${clientId}/notes`, { notes }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      setEditing(false);
+      toast({ title: "Anotações salvas com sucesso" });
+    },
+  });
+
+  return (
+    <Card className="p-5" data-testid="section-notes">
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <div className="flex items-center gap-2">
+          <Pencil className="w-4 h-4 text-primary" />
+          <h2 className="font-semibold">Anotações Livres</h2>
+        </div>
+        {!editing ? (
+          <Button variant="ghost" size="sm" onClick={() => { setNotes(client?.notes || ""); setEditing(true); }} data-testid="button-edit-notes">
+            Editar
+          </Button>
+        ) : (
+          <div className="flex gap-1">
+            <Button size="sm" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} data-testid="button-save-notes">
+              <Save className="w-3.5 h-3.5 mr-1" /> Salvar
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setEditing(false)} data-testid="button-cancel-notes">
+              <X className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+        )}
+      </div>
+      {editing ? (
+        <RichTextEditor content={notes} onChange={setNotes} placeholder="Anotações internas sobre o cliente, estratégias, observações..." />
+      ) : (
+        client?.notes ? (
+          <RichTextDisplay content={client.notes} />
+        ) : (
+          <p className="text-sm text-muted-foreground">Nenhuma anotação adicionada ainda.</p>
         )
       )}
     </Card>
@@ -876,85 +910,6 @@ function CredentialsSection({ clientId, credentials }: { clientId: number; crede
               <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive invisible group-hover:visible shrink-0" onClick={() => deleteMutation.mutate(cred.id)} data-testid={`button-delete-credential-${cred.id}`}>
                 <Trash2 className="w-3 h-3" />
               </Button>
-            </div>
-          ))
-        )}
-      </div>
-    </Card>
-  );
-}
-
-function InsightsSection({ clientId, insights }: { clientId: number; insights: ClientInsight[] }) {
-  const { toast } = useToast();
-  const [message, setMessage] = useState("");
-
-  const createMutation = useMutation({
-    mutationFn: (data: { message: string }) => apiRequest("POST", `/api/onboarding/${clientId}/insights`, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/onboarding", clientId, "insights"] });
-      setMessage("");
-      toast({ title: "Insight publicado" });
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/onboarding/insights/${id}`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/onboarding", clientId, "insights"] });
-    },
-  });
-
-  return (
-    <Card className="p-5" data-testid="section-insights">
-      <div className="flex items-center gap-2 mb-3">
-        <Lightbulb className="w-4 h-4 text-primary" />
-        <h2 className="font-semibold">Insights</h2>
-        <Badge variant="secondary" className="text-xs no-default-hover-elevate no-default-active-elevate">{insights.length}</Badge>
-      </div>
-
-      <div className="flex gap-2 mb-3">
-        <Textarea
-          value={message}
-          onChange={e => setMessage(e.target.value)}
-          placeholder="Compartilhe uma ideia, observação de mercado..."
-          className="min-h-[60px] text-sm"
-          data-testid="input-insight-message"
-        />
-        <Button
-          size="icon"
-          onClick={() => message.trim() && createMutation.mutate({ message: message.trim() })}
-          disabled={!message.trim() || createMutation.isPending}
-          className="shrink-0 self-end"
-          data-testid="button-send-insight"
-        >
-          <Send className="w-4 h-4" />
-        </Button>
-      </div>
-
-      <div className="space-y-2 max-h-[400px] overflow-y-auto">
-        {insights.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nenhum insight publicado ainda.</p>
-        ) : (
-          insights.map(insight => (
-            <div key={insight.id} className="p-3 rounded-md bg-muted/20 group" data-testid={`insight-${insight.id}`}>
-              <div className="flex items-center justify-between gap-2 mb-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold">{insight.userName}</span>
-                  <span className="text-[10px] text-muted-foreground">
-                    {format(new Date(insight.createdAt), "dd/MM/yyyy HH:mm", { locale: ptBR })}
-                  </span>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 text-destructive invisible group-hover:visible"
-                  onClick={() => deleteMutation.mutate(insight.id)}
-                  data-testid={`button-delete-insight-${insight.id}`}
-                >
-                  <Trash2 className="w-3 h-3" />
-                </Button>
-              </div>
-              <p className="text-sm whitespace-pre-wrap">{insight.message}</p>
             </div>
           ))
         )}

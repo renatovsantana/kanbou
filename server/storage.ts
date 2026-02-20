@@ -178,6 +178,7 @@ export interface IStorage {
   deleteClientCredential(id: number): Promise<void>;
 
   getClientInsights(clientId: number): Promise<ClientInsight[]>;
+  getAllClientInsights(): Promise<ClientInsight[]>;
   createClientInsight(insight: InsertClientInsight): Promise<ClientInsight>;
   deleteClientInsight(id: number): Promise<void>;
 
@@ -646,6 +647,9 @@ export class DatabaseStorage implements IStorage {
 
   async getClientInsights(clientId: number): Promise<ClientInsight[]> {
     return await db.select().from(clientInsights).where(eq(clientInsights.clientId, clientId)).orderBy(desc(clientInsights.createdAt));
+  }
+  async getAllClientInsights(): Promise<ClientInsight[]> {
+    return await db.select().from(clientInsights).orderBy(desc(clientInsights.createdAt));
   }
   async createClientInsight(insight: InsertClientInsight): Promise<ClientInsight> {
     const [i] = await db.insert(clientInsights).values(insight).returning();

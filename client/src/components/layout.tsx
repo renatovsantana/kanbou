@@ -28,6 +28,7 @@ import {
   Plus,
   Loader2,
   Settings,
+  Lightbulb,
 } from "lucide-react";
 import { useState, useMemo, createContext, useContext } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -82,6 +83,7 @@ function NotificationBell({
       case "revision_requested": return "Revisão solicitada";
       case "comment_added": return "Comentário";
       case "card_scheduled": return "Agendado";
+      case "insight": return "Insight";
       default: return "Notificação";
     }
   };
@@ -94,6 +96,7 @@ function NotificationBell({
       case "approval_sent": return "text-blue-500";
       case "comment_added": return "text-purple-500";
       case "card_scheduled": return "text-cyan-500";
+      case "insight": return "text-amber-500";
       default: return "text-muted-foreground";
     }
   };
@@ -201,6 +204,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [clientsExpanded, setClientsExpanded] = useState(true);
   const [kanbanClientsExpanded, setKanbanClientsExpanded] = useState(true);
+  const [insightsClientsExpanded, setInsightsClientsExpanded] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
@@ -381,6 +385,67 @@ export function Layout({ children }: { children: React.ReactNode }) {
     return <NavSection label="Publicações" items={postsNav} />;
   };
 
+  const InsightsSection = () => {
+    const isInsightsActive = location === "/insights" || location.startsWith("/insights");
+    const showClientTree = role === "admin" || role === "designer";
+
+    if (!showClientTree) {
+      return <NavSection label="Insights" items={[{ name: "Insights", href: "/insights", icon: Lightbulb }]} />;
+    }
+
+    return (
+      <div className="mb-5">
+        <p className="px-3 text-[10px] font-semibold uppercase tracking-[0.15em] mb-2" style={{ color: 'hsl(var(--sidebar-fg) / 0.3)' }}>
+          Insights
+        </p>
+        <div className="space-y-0.5">
+          <Link href="/insights">
+            <div
+              className={`sidebar-link ${isInsightsActive ? "active" : ""}`}
+              data-testid="nav-insights"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              <Lightbulb className="w-[18px] h-[18px] sidebar-link-icon" />
+              Insights
+              <button
+                className="ml-auto"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setInsightsClientsExpanded(!insightsClientsExpanded);
+                }}
+              >
+                {insightsClientsExpanded ? (
+                  <ChevronDown className="w-3.5 h-3.5" style={{ color: 'hsl(var(--sidebar-fg) / 0.5)' }} />
+                ) : (
+                  <ChevronRight className="w-3.5 h-3.5" style={{ color: 'hsl(var(--sidebar-fg) / 0.5)' }} />
+                )}
+              </button>
+            </div>
+          </Link>
+          {insightsClientsExpanded && clientsList.filter((c) => c.isActive !== false).map((client) => (
+            <Link key={client.id} href={`/insights?clientId=${client.id}`}>
+              <div
+                className="sidebar-link pl-9 cursor-pointer flex items-center gap-2"
+                onClick={() => setIsMobileMenuOpen(false)}
+                data-testid={`nav-insights-client-${client.id}`}
+              >
+                {client.logoUrl ? (
+                  <img src={client.logoUrl} alt="" className="w-4 h-4 rounded-full object-cover shrink-0" />
+                ) : (
+                  <div className="w-4 h-4 rounded-full shrink-0 flex items-center justify-center text-[8px] font-bold" style={{ background: 'hsl(var(--sidebar-accent) / 0.3)', color: 'hsl(var(--sidebar-fg) / 0.7)' }}>
+                    {client.name.charAt(0)}
+                  </div>
+                )}
+                <span className="text-xs truncate flex-1">{client.name}</span>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   const initials = user?.name
     ? user.name.split(" ").map(w => w[0]).join("").substring(0, 2).toUpperCase()
     : "AD";
@@ -414,6 +479,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <NavSection label="Briefing" items={briefingNav} />
         )}
 
+        <InsightsSection />
+
         {(role === "admin" || role === "designer" || role === "client") && (
           <NavSection label="Onboarding" items={[
             { name: "Onboarding", href: "/onboarding", icon: ClipboardCheck },
@@ -431,6 +498,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               { name: "Aprovações", href: "/aprovacoes", icon: CheckSquare },
             ]} />
             <NavSection label="Briefing" items={briefingNav} />
+            <InsightsSection />
           </>
         )}
       </div>

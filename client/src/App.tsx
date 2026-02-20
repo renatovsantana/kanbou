@@ -19,6 +19,7 @@ import ReportsPage from "@/pages/reports";
 import ClientApprovals from "@/pages/client-approvals";
 import ClientOnboarding from "@/pages/client-onboarding";
 import ErrorReportsPage from "@/pages/error-reports";
+import InsightsPage from "@/pages/insights";
 import SettingsPage from "@/pages/settings";
 import LoginPage from "@/pages/login";
 import NotFound from "@/pages/not-found";
@@ -51,6 +52,7 @@ function ProtectedRouter() {
         <Route path="/kanban" component={KanbanBoard} />
         <Route path="/reports" component={ReportsPage} />
         <Route path="/onboarding" component={ClientOnboarding} />
+        <Route path="/insights" component={InsightsPage} />
         <Route path="/aprovacoes" component={ClientApprovals} />
         <Route path="/error-reports" component={ErrorReportsPage} />
         <Route path="/settings" component={SettingsPage} />

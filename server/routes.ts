@@ -2514,6 +2514,25 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
+  app.get("/api/insights/all", requireAuth, async (req, res) => {
+    const user = await getCurrentUser(req);
+    if (!user) return res.status(401).json({ message: "Não autenticado" });
+    const allUsers = await storage.getUsers();
+    const userMap: Record<number, string> = {};
+    allUsers.forEach(u => { userMap[u.id] = u.name; });
+    let insights: any[];
+    if (user.role === "client" && user.clientId) {
+      insights = await storage.getClientInsights(user.clientId);
+    } else {
+      insights = await storage.getAllClientInsights();
+    }
+    const clients = await storage.getClients();
+    const clientMap: Record<number, string> = {};
+    clients.forEach(c => { clientMap[c.id] = c.name; });
+    const enriched = insights.map(i => ({ ...i, userName: userMap[i.userId] || "Desconhecido", clientName: clientMap[i.clientId] || "Cliente" }));
+    res.json(enriched);
+  });
+
   app.get("/api/onboarding/:clientId/insights", requireAuth, async (req, res) => {
     const clientId = Number(req.params.clientId);
     if (!(await checkOnboardingAccess(req, clientId))) return res.status(403).json({ message: "Acesso negado" });
@@ -2561,6 +2580,14 @@ export async function registerRoutes(
     if (!(await checkOnboardingAccess(req, clientId))) return res.status(403).json({ message: "Acesso negado" });
     const about = z.string().optional().parse(req.body.about);
     const updated = await storage.updateClient(clientId, { about: about || null });
+    res.json(updated);
+  });
+
+  app.put("/api/clients/:id/notes", requireAuth, async (req, res) => {
+    const clientId = Number(req.params.id);
+    if (!(await checkOnboardingAccess(req, clientId))) return res.status(403).json({ message: "Acesso negado" });
+    const notes = z.string().optional().parse(req.body.notes);
+    const updated = await storage.updateClient(clientId, { notes: notes || null });
     res.json(updated);
   });
 
