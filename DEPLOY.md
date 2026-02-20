@@ -130,7 +130,7 @@ DATABASE_URL=postgresql://kanbou_user:SENHA@localhost:5432/kanbou
 SESSION_SECRET=string-aleatoria-gerada
 
 # Servidor
-PORT=5000
+PORT=5001
 NODE_ENV=production
 
 # Google Drive OAuth2 (preencher manualmente)
@@ -175,7 +175,7 @@ GOOGLE_REFRESH_TOKEN=
 │   ├── setup-server.sh      # Script de instalação
 │   ├── update.sh            # Script de atualização
 │   └── backup.sh            # Script de backup
-├── ecosystem.config.js      # Config do PM2
+├── ecosystem.config.cjs     # Config do PM2
 ├── .env                     # Variáveis de ambiente
 └── package.json
 ```

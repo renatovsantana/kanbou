@@ -70,7 +70,7 @@ cd $APP_DIR
 cat > .env << ENVFILE
 DATABASE_URL=postgresql://$DB_USER:$DB_PASS@localhost:5432/$DB_NAME
 SESSION_SECRET=$SESSION_SECRET
-PORT=5000
+PORT=5001
 NODE_ENV=production
 
 # Google Drive OAuth2 (preencha com suas credenciais)
@@ -92,7 +92,7 @@ mkdir -p uploads/public uploads/private server/thumbnails
 # 7. Configurar PM2
 echo "[7/9] Configurando PM2..."
 npm install -g pm2
-pm2 start ecosystem.config.js
+pm2 start ecosystem.config.cjs
 pm2 startup systemd -u root --hp /root
 pm2 save
 
