@@ -284,7 +284,6 @@ export const DEFAULT_KANBAN_COLUMNS = [
   "Agendados",
   "Postados",
   "Finalizados",
-  "Fotos já usadas",
 ];
 
 export const MANDATORY_FIRST_COLUMN = "Fila";
