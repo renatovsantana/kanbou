@@ -67,14 +67,7 @@ export default function CalendarView() {
     }
 
     if (scheduledCards) {
-      const postKanbanIds = new Set(
-        (posts || [])
-          .filter((p: any) => p.kanbanCardId)
-          .map((p: any) => p.kanbanCardId)
-      );
-
       for (const card of scheduledCards) {
-        if (postKanbanIds.has(card.kanbanCardId)) continue;
         items.push({
           id: card.id,
           title: card.title || "",

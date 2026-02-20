@@ -951,9 +951,23 @@ export async function registerRoutes(
       const allClients = await storage.getClients();
       const clientMap = new Map(allClients.map(c => [c.id, c.name]));
 
-      const result = filtered.map(({ card, columnTitle }) => {
+      const allPosts = await storage.getPosts();
+      const postKanbanIds = new Set(allPosts.filter(p => p.kanbanCardId).map(p => p.kanbanCardId));
+      const postKeys = new Set(allPosts.map(p => `${p.clientId}-${(p.title || "").toLowerCase().trim()}`));
+
+      const result: any[] = [];
+      for (const { card, columnTitle } of filtered) {
+        if (postKanbanIds.has(card.id)) continue;
+
         let templateObj: Record<string, string> = {};
         try { if (card.templateData) templateObj = JSON.parse(card.templateData as string); } catch {}
+
+        const scheduledDate = templateObj.publishDate || templateObj.deadline;
+        if (!scheduledDate) continue;
+
+        const cardTitle = templateObj.postTitle || templateObj.headline || templateObj.materialTitle || card.title;
+        const cardKey = `${card.clientId}-${(cardTitle || "").toLowerCase().trim()}`;
+        if (postKeys.has(cardKey)) continue;
 
         let platforms: string[] = [];
         try {
@@ -967,20 +981,20 @@ export async function registerRoutes(
 
         const status = columnTitle === "Postados" ? "Postado" : "Agendado";
 
-        return {
+        result.push({
           id: `kanban-${card.id}`,
           kanbanCardId: card.id,
-          title: templateObj.postTitle || templateObj.headline || card.title,
+          title: cardTitle,
           clientId: card.clientId,
           clientName: clientMap.get(card.clientId) || "Cliente",
           content: templateObj.caption || card.description || "",
           platform: platforms,
-          scheduledDate: templateObj.publishDate || card.createdAt,
+          scheduledDate,
           status,
           cardType: card.cardType,
           source: "kanban" as const,
-        };
-      });
+        });
+      }
 
       res.json(result);
     } catch (err) {
