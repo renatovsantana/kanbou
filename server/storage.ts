@@ -86,6 +86,7 @@ export interface IStorage {
   deleteClient(id: number): Promise<void>;
 
   getClientCustomLinks(clientId: number): Promise<ClientCustomLink[]>;
+  getClientCustomLink(id: number): Promise<ClientCustomLink | undefined>;
   createClientCustomLink(link: InsertClientCustomLink): Promise<ClientCustomLink>;
   updateClientCustomLink(id: number, updates: Partial<InsertClientCustomLink>): Promise<ClientCustomLink>;
   deleteClientCustomLink(id: number): Promise<void>;
@@ -279,6 +280,11 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(clientCustomLinks)
       .where(eq(clientCustomLinks.clientId, clientId))
       .orderBy(asc(clientCustomLinks.position));
+  }
+
+  async getClientCustomLink(id: number): Promise<ClientCustomLink | undefined> {
+    const [link] = await db.select().from(clientCustomLinks).where(eq(clientCustomLinks.id, id));
+    return link;
   }
 
   async createClientCustomLink(link: InsertClientCustomLink): Promise<ClientCustomLink> {

@@ -1442,6 +1442,7 @@ function LinkPageSection({ clientId, client }: { clientId: number; client?: Clie
   const { toast } = useToast();
   const { user } = useAuth();
   const isEditor = user?.role === "admin" || user?.role === "designer";
+  const canEditLinkPage = isEditor || user?.role === "client";
   const [editing, setEditing] = useState(false);
   const [copied, setCopied] = useState(false);
   const [form, setForm] = useState({
@@ -1502,7 +1503,7 @@ function LinkPageSection({ clientId, client }: { clientId: number; client?: Clie
   const saveMutation = useMutation({
     mutationFn: () => {
       const slug = form.slug || generateSlug(client?.name || "");
-      return apiRequest("PUT", `/api/clients/${clientId}`, {
+      return apiRequest("PUT", `/api/onboarding/${clientId}/linkpage`, {
         bio: form.bio || null,
         whatsapp: form.whatsapp || null,
         website: form.website || null,
@@ -1581,7 +1582,7 @@ function LinkPageSection({ clientId, client }: { clientId: number; client?: Clie
           <Link2 className="w-4 h-4 text-primary" />
           <h2 className="font-semibold">Link Page</h2>
         </div>
-        {isEditor && !editing && (
+        {canEditLinkPage && !editing && (
           <Button variant="ghost" size="sm" onClick={() => setEditing(true)} data-testid="button-edit-linkpage">
             <Sparkles className="w-4 h-4 mr-1" /> Editar
           </Button>

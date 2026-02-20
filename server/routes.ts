@@ -1209,6 +1209,34 @@ export async function registerRoutes(
     }
   });
 
+  app.put("/api/onboarding/:clientId/linkpage", requireAuth, async (req, res) => {
+    const clientId = Number(req.params.clientId);
+    if (!(await checkOnboardingAccess(req, clientId))) return res.status(403).json({ message: "Acesso negado" });
+    const { bio, whatsapp, website, facebook, tiktok, linkedin, youtube, primaryColor, secondaryColor, slug, linkPageVisibility, linkPageTheme } = req.body;
+    const updates: Record<string, any> = {};
+    if (bio !== undefined) updates.bio = bio || null;
+    if (whatsapp !== undefined) updates.whatsapp = whatsapp || null;
+    if (website !== undefined) updates.website = website || null;
+    if (facebook !== undefined) updates.facebook = facebook || null;
+    if (tiktok !== undefined) updates.tiktok = tiktok || null;
+    if (linkedin !== undefined) updates.linkedin = linkedin || null;
+    if (youtube !== undefined) updates.youtube = youtube || null;
+    if (primaryColor !== undefined) updates.primaryColor = primaryColor || null;
+    if (secondaryColor !== undefined) updates.secondaryColor = secondaryColor || null;
+    if (slug !== undefined) updates.slug = slug || null;
+    if (linkPageVisibility !== undefined) updates.linkPageVisibility = linkPageVisibility;
+    if (linkPageTheme !== undefined) updates.linkPageTheme = linkPageTheme;
+    try {
+      const updated = await storage.updateClient(clientId, updates);
+      res.json(updated);
+    } catch (err: any) {
+      if (err?.message?.includes("unique") || err?.code === "23505") {
+        return res.status(400).json({ message: "Este slug já está em uso. Escolha outro." });
+      }
+      throw err;
+    }
+  });
+
   app.get("/api/onboarding/:clientId/custom-links", requireAuth, async (req, res) => {
     const clientId = Number(req.params.clientId);
     if (!(await checkOnboardingAccess(req, clientId))) return res.status(403).json({ message: "Acesso negado" });
@@ -1237,9 +1265,21 @@ export async function registerRoutes(
     res.json(updated);
   });
 
-  app.delete("/api/custom-links/:id", requireAuth, requireRole(["admin", "designer"]), async (req, res) => {
-    await storage.deleteClientCustomLink(Number(req.params.id));
-    res.json({ success: true });
+  app.delete("/api/custom-links/:id", requireAuth, async (req, res) => {
+    const user = await getCurrentUser(req);
+    if (!user) return res.status(401).json({ message: "Não autenticado" });
+    if (user.role === "admin" || user.role === "designer") {
+      await storage.deleteClientCustomLink(Number(req.params.id));
+      return res.json({ success: true });
+    }
+    if (user.role === "client" && user.clientId) {
+      const link = await storage.getClientCustomLink(Number(req.params.id));
+      if (link && link.clientId === user.clientId) {
+        await storage.deleteClientCustomLink(Number(req.params.id));
+        return res.json({ success: true });
+      }
+    }
+    return res.status(403).json({ message: "Acesso negado" });
   });
 
   const BRIEFING_UPLOADS_DIR = path.join(process.cwd(), "uploads", "briefings");
