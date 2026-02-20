@@ -242,6 +242,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteUser(id: number): Promise<void> {
+    await db.delete(notifications).where(eq(notifications.recipientUserId, id));
+    await db.delete(kanbanComments).where(eq(kanbanComments.userId, id));
+    await db.delete(kanbanTimeEntries).where(eq(kanbanTimeEntries.userId, id));
+    await db.delete(kanbanActivity).where(eq(kanbanActivity.userId, id));
+    await db.delete(userClientAccess).where(eq(userClientAccess.userId, id));
+    await db.delete(clientInsights).where(eq(clientInsights.userId, id));
+    await db.delete(clientOnboardingAccess).where(eq(clientOnboardingAccess.userId, id));
+    await db.update(kanbanCards).set({ createdBy: null }).where(eq(kanbanCards.createdBy, id));
+    await db.execute(sql`UPDATE posts SET designer_id = NULL WHERE designer_id = ${id}`);
+    await db.update(brandIdentityFiles).set({ uploadedBy: null }).where(eq(brandIdentityFiles.uploadedBy, id));
+    await db.update(errorReports).set({ reporterUserId: null }).where(eq(errorReports.reporterUserId, id));
+    await db.update(errorReports).set({ resolvedBy: null }).where(eq(errorReports.resolvedBy, id));
+    await db.update(briefingTemplates).set({ createdBy: null }).where(eq(briefingTemplates.createdBy, id));
+    await db.update(briefings).set({ createdBy: null }).where(eq(briefings.createdBy, id));
     await db.delete(users).where(eq(users.id, id));
   }
 
