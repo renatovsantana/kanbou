@@ -945,9 +945,9 @@ export async function registerRoutes(
     const filtered = allNotifications.filter(n => {
       if (n.recipientUserId === user.id) return true;
       if (user.role === "admin" && (!n.recipientRole || n.recipientRole === "admin" || n.recipientRole === "all")) return true;
-      if (n.recipientRole === user.role) return true;
-      if (n.recipientRole === "all") return true;
+      if (user.role === "designer" && n.recipientRole === "designer") return true;
       if (user.role === "client" && n.recipientRole === "client" && n.clientId && user.clientId === n.clientId) return true;
+      if (n.recipientRole === "all") return true;
       return false;
     });
     res.json(filtered);
@@ -961,9 +961,9 @@ export async function registerRoutes(
       if (n.isRead) return false;
       if (n.recipientUserId === user.id) return true;
       if (user.role === "admin" && (!n.recipientRole || n.recipientRole === "admin" || n.recipientRole === "all")) return true;
-      if (n.recipientRole === user.role) return true;
-      if (n.recipientRole === "all") return true;
+      if (user.role === "designer" && n.recipientRole === "designer") return true;
       if (user.role === "client" && n.recipientRole === "client" && n.clientId && user.clientId === n.clientId) return true;
+      if (n.recipientRole === "all") return true;
       return false;
     });
     res.json({ count: filtered.length });
