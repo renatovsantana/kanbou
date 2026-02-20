@@ -954,10 +954,22 @@ export default function KanbanBoard() {
     mutationFn: async ({ cardId, toColumnId, newPosition }: { cardId: number; toColumnId: number; newPosition: number }) => {
       await apiRequest("PUT", `/api/kanban/cards/${cardId}/move`, { toColumnId, newPosition });
     },
+    onMutate: async ({ cardId, toColumnId, newPosition }) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/kanban", clientId, "cards"] });
+      const previousCards = queryClient.getQueryData<KanbanCard[]>(["/api/kanban", clientId, "cards"]);
+      queryClient.setQueryData<KanbanCard[]>(["/api/kanban", clientId, "cards"], (old) => {
+        if (!old) return old;
+        return old.map(c => c.id === cardId ? { ...c, columnId: toColumnId, position: newPosition } : c);
+      });
+      return { previousCards };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/kanban", clientId, "cards"] });
     },
-    onError: (error: any) => {
+    onError: (error: any, _vars, context) => {
+      if (context?.previousCards) {
+        queryClient.setQueryData(["/api/kanban", clientId, "cards"], context.previousCards);
+      }
       let msg = "Erro ao mover cartão";
       try {
         const raw = error?.message || "";
