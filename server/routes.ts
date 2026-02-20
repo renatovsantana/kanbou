@@ -3009,21 +3009,16 @@ export async function registerRoutes(
           return created >= startDate && created <= endDate;
         });
 
-        const approvedCol = columns.find(c => c.title === "Aprovados");
-        const pendingCol = columns.find(c => c.title === "Em Aprovação");
-        const scheduledCol = columns.find(c => c.title === "Agendados");
-        const postedCol = columns.find(c => c.title === "Postados");
-        const finishedCol = columns.find(c => c.title === "Finalizados");
-        const revisionCol = columns.find(c => c.title === "Revisão");
-        const rejectedCol = columns.find(c => c.title === "Reprovados");
+        const columnMap = new Map(columns.map(c => [c.id, c.title]));
 
-        const approvedCards = approvedCol ? cardsInPeriod.filter(c => c.columnId === approvedCol.id) : [];
-        const pendingCards = pendingCol ? cardsInPeriod.filter(c => c.columnId === pendingCol.id) : [];
-        const scheduledCards = scheduledCol ? cardsInPeriod.filter(c => c.columnId === scheduledCol.id) : [];
-        const postedCards = postedCol ? cardsInPeriod.filter(c => c.columnId === postedCol.id) : [];
-        const finishedCards = finishedCol ? cardsInPeriod.filter(c => c.columnId === finishedCol.id) : [];
-        const revisionCards = revisionCol ? cardsInPeriod.filter(c => c.columnId === revisionCol.id) : [];
-        const rejectedCards = rejectedCol ? cardsInPeriod.filter(c => c.columnId === rejectedCol.id) : [];
+        const approvedCards = cardsInPeriod.filter(c => c.approvalStatus === "Aprovado");
+        const pendingCards = cardsInPeriod.filter(c => c.approvalStatus === "Pendente");
+        const revisionCards = cardsInPeriod.filter(c => c.approvalStatus === "Revisão");
+        const rejectedCards = cardsInPeriod.filter(c => c.approvalStatus === "Reprovado");
+
+        const scheduledCards = cardsInPeriod.filter(c => columnMap.get(c.columnId) === "Agendados");
+        const postedCards = cardsInPeriod.filter(c => columnMap.get(c.columnId) === "Postados");
+        const finishedCards = cardsInPeriod.filter(c => columnMap.get(c.columnId) === "Finalizados");
 
         const posts = await storage.getPostsByClient(cId);
         const postsInPeriod = posts.filter(p => {

@@ -68,7 +68,7 @@ import {
   type InsertErrorReport,
   type SystemSetting,
 } from "@shared/schema";
-import { eq, desc, and, or, asc, isNull, gte, lte, sql, arrayContains } from "drizzle-orm";
+import { eq, desc, and, or, asc, isNull, gte, lte, sql, arrayContains, inArray } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
@@ -432,7 +432,7 @@ export class DatabaseStorage implements IStorage {
     }
     await db.update(notifications)
       .set({ isRead: true })
-      .where(and(...conditions, sql`${notifications.type} = ANY(${kanbanTypes})`));
+      .where(and(...conditions, inArray(notifications.type, kanbanTypes)));
   }
 
   async markInsightNotificationsRead(role: string, clientId?: number): Promise<void> {
