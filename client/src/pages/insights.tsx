@@ -34,6 +34,7 @@ import {
   MessageCircle,
   Filter,
   Sparkles,
+  PenLine,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -60,6 +61,7 @@ export default function InsightsPage() {
   const [selectedClientId, setSelectedClientId] = useState<string>(initialClientId);
   const [message, setMessage] = useState("");
   const [insightToDelete, setInsightToDelete] = useState<number | null>(null);
+  const [showComposer, setShowComposer] = useState(false);
 
   const { data: clients = [] } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
@@ -81,6 +83,7 @@ export default function InsightsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/insights/all"] });
       setMessage("");
+      setShowComposer(false);
       toast({ title: "Insight publicado com sucesso" });
     },
   });
@@ -95,7 +98,9 @@ export default function InsightsPage() {
   });
 
   const canDelete = user?.role === "admin" || user?.role === "designer";
-  const postClientId = selectedClientId !== "all" ? Number(selectedClientId) : null;
+  const postClientId = isClient
+    ? (user?.clientId || null)
+    : (selectedClientId !== "all" ? Number(selectedClientId) : null);
 
   const groupedByDate = filteredInsights.reduce<Record<string, EnrichedInsight[]>>((acc, insight) => {
     const dateKey = format(new Date(insight.createdAt), "yyyy-MM-dd");
@@ -114,45 +119,69 @@ export default function InsightsPage() {
     );
   }
 
+  const selectedClientName = postClientId
+    ? activeClients.find(c => c.id === postClientId)?.name || ""
+    : "";
+
   return (
     <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
-            <Lightbulb className="w-5 h-5 text-amber-500" />
+      <div className="rounded-xl overflow-hidden bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-yellow-500/10 dark:from-amber-500/15 dark:via-orange-500/10 dark:to-yellow-500/5 p-6 md:p-8">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/20 dark:bg-amber-500/30 flex items-center justify-center shrink-0">
+              <Lightbulb className="w-6 h-6 text-amber-500" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold" data-testid="text-insights-title">Insights</h1>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                {isClient
+                  ? "Compartilhe ideias e observações com a agência"
+                  : "Compartilhe ideias e observações com sua equipe"}
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-bold" data-testid="text-insights-title">Insights</h1>
-            <p className="text-sm text-muted-foreground">Compartilhe ideias e observações com sua equipe</p>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            {!isClient && (
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-muted-foreground" />
+                <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+                  <SelectTrigger className="w-[200px]" data-testid="select-insights-client">
+                    <SelectValue placeholder="Filtrar por cliente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os clientes</SelectItem>
+                    {activeClients.map(c => (
+                      <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {postClientId && !showComposer && (
+              <Button
+                onClick={() => setShowComposer(true)}
+                data-testid="button-new-insight"
+              >
+                <PenLine className="w-4 h-4 mr-2" />
+                Novo Insight
+              </Button>
+            )}
           </div>
         </div>
-
-        {!isClient && (
-          <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-muted-foreground" />
-            <Select value={selectedClientId} onValueChange={setSelectedClientId}>
-              <SelectTrigger className="w-[200px]" data-testid="select-insights-client">
-                <SelectValue placeholder="Filtrar por cliente" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os clientes</SelectItem>
-                {activeClients.map(c => (
-                  <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
       </div>
 
-      {postClientId && (
-        <Card className="p-5" data-testid="section-new-insight">
-          <div className="flex items-center gap-2 mb-3">
-            <Sparkles className="w-4 h-4 text-primary" />
-            <span className="text-sm font-medium">Novo Insight</span>
-            <Badge variant="secondary" className="text-xs no-default-hover-elevate no-default-active-elevate">
-              {activeClients.find(c => c.id === postClientId)?.name || ""}
-            </Badge>
+      {showComposer && postClientId && (
+        <Card className="p-5 border-amber-500/20" data-testid="section-new-insight">
+          <div className="flex items-center gap-2 mb-4">
+            <Sparkles className="w-4 h-4 text-amber-500" />
+            <span className="text-sm font-semibold">Novo Insight</span>
+            {selectedClientName && (
+              <Badge variant="secondary" className="text-xs no-default-hover-elevate no-default-active-elevate">
+                {selectedClientName}
+              </Badge>
+            )}
           </div>
           <div className="space-y-3">
             <RichTextEditor
@@ -160,21 +189,32 @@ export default function InsightsPage() {
               onChange={setMessage}
               placeholder="Compartilhe uma ideia, observação de mercado, tendência..."
             />
-            <div className="flex justify-end">
+            <div className="flex items-center justify-end gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => { setShowComposer(false); setMessage(""); }}
+                data-testid="button-cancel-insight"
+              >
+                Cancelar
+              </Button>
               <Button
                 onClick={() => message.trim() && createMutation.mutate({ clientId: postClientId, message: message.trim() })}
                 disabled={!message.trim() || createMutation.isPending}
                 data-testid="button-send-insight"
               >
-                <Send className="w-4 h-4 mr-2" />
-                Publicar Insight
+                {createMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4 mr-2" />
+                )}
+                Publicar
               </Button>
             </div>
           </div>
         </Card>
       )}
 
-      {!postClientId && (
+      {!postClientId && !isClient && (
         <Card className="p-5 bg-muted/30 border-dashed">
           <div className="flex items-center gap-3 text-muted-foreground">
             <MessageCircle className="w-5 h-5" />
@@ -184,43 +224,63 @@ export default function InsightsPage() {
       )}
 
       {filteredInsights.length === 0 ? (
-        <Card className="p-12 flex flex-col items-center justify-center text-center">
-          <Lightbulb className="w-12 h-12 text-muted-foreground/20 mb-3" />
-          <p className="text-muted-foreground" data-testid="text-no-insights">
-            Nenhum insight publicado ainda.
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="w-20 h-20 rounded-3xl bg-amber-500/10 dark:bg-amber-500/15 flex items-center justify-center mb-5">
+            <Lightbulb className="w-10 h-10 text-amber-500/40" />
+          </div>
+          <p className="text-lg font-medium text-muted-foreground" data-testid="text-no-insights">
+            Nenhum insight publicado ainda
           </p>
-          <p className="text-sm text-muted-foreground/60 mt-1">
-            Selecione um cliente e compartilhe suas ideias!
+          <p className="text-sm text-muted-foreground/60 mt-2 max-w-sm">
+            {isClient
+              ? "Compartilhe suas ideias, observações e sugestões com a agência clicando em \"Novo Insight\"."
+              : "Selecione um cliente e compartilhe ideias e observações de mercado."}
           </p>
-        </Card>
+          {postClientId && !showComposer && (
+            <Button
+              className="mt-6"
+              onClick={() => setShowComposer(true)}
+              data-testid="button-new-insight-empty"
+            >
+              <PenLine className="w-4 h-4 mr-2" />
+              Criar primeiro insight
+            </Button>
+          )}
+        </div>
       ) : (
         <div className="space-y-6">
           {sortedDates.map(dateKey => (
             <div key={dateKey}>
               <div className="flex items-center gap-3 mb-3">
                 <div className="h-px flex-1 bg-border" />
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide px-2">
                   {format(new Date(dateKey + "T12:00:00"), "dd 'de' MMMM, yyyy", { locale: ptBR })}
                 </span>
                 <div className="h-px flex-1 bg-border" />
               </div>
               <div className="space-y-3">
                 {groupedByDate[dateKey].map(insight => (
-                  <Card key={insight.id} className="p-4 group" data-testid={`insight-card-${insight.id}`}>
+                  <Card key={insight.id} className="p-4 group hover-elevate" data-testid={`insight-card-${insight.id}`}>
                     <div className="flex items-start justify-between gap-3 mb-2">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                          <span className="text-xs font-bold text-primary">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400/20 to-orange-400/20 dark:from-amber-400/30 dark:to-orange-400/30 flex items-center justify-center shrink-0">
+                          <span className="text-xs font-bold text-amber-600 dark:text-amber-400">
                             {insight.userName.charAt(0).toUpperCase()}
                           </span>
                         </div>
-                        <span className="text-sm font-semibold">{insight.userName}</span>
-                        <Badge variant="outline" className="text-[10px] no-default-hover-elevate no-default-active-elevate">
-                          {insight.clientName}
-                        </Badge>
-                        <span className="text-[10px] text-muted-foreground">
-                          {format(new Date(insight.createdAt), "HH:mm", { locale: ptBR })}
-                        </span>
+                        <div className="flex flex-col">
+                          <span className="text-sm font-semibold leading-tight">{insight.userName}</span>
+                          <div className="flex items-center gap-1.5">
+                            {!isClient && (
+                              <Badge variant="outline" className="text-[10px] no-default-hover-elevate no-default-active-elevate">
+                                {insight.clientName}
+                              </Badge>
+                            )}
+                            <span className="text-[10px] text-muted-foreground">
+                              {format(new Date(insight.createdAt), "HH:mm", { locale: ptBR })}
+                            </span>
+                          </div>
+                        </div>
                       </div>
                       {canDelete && (
                         <Button
@@ -234,7 +294,7 @@ export default function InsightsPage() {
                         </Button>
                       )}
                     </div>
-                    <div className="pl-9">
+                    <div className="pl-10">
                       <RichTextDisplay content={insight.message} />
                     </div>
                   </Card>
