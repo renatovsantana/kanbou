@@ -67,7 +67,7 @@ function resolveInitialDark(defaultTheme: string): boolean {
 
 export default function LinkPage() {
   const params = useParams<{ slug: string }>();
-  const [activeSection, setActiveSection] = useState("sobre");
+  const [activeSection, setActiveSection] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [dark, setDark] = useState(false);
   const [themeInitialized, setThemeInitialized] = useState(false);
@@ -81,6 +81,14 @@ export default function LinkPage() {
     if (data && !themeInitialized) {
       setDark(resolveInitialDark(data.defaultTheme));
       setThemeInitialized(true);
+      const aboutContent = data.about?.replace(/<[^>]*>/g, "").trim() || "";
+      if (aboutContent.length > 0) {
+        setActiveSection("sobre");
+      } else if (data.products.length > 0) {
+        setActiveSection("produtos");
+      } else if (data.services.length > 0) {
+        setActiveSection("servicos");
+      }
     }
   }, [data, themeInitialized]);
 
@@ -130,9 +138,10 @@ export default function LinkPage() {
   const hasProducts = data.products.length > 0;
   const hasServices = data.services.length > 0;
   const hasCustomLinks = (data.customLinks || []).length > 0;
+  const hasAbout = !!(data.about && data.about.replace(/<[^>]*>/g, "").trim().length > 0);
 
   const menuItems = [
-    { id: "sobre", label: "Sobre", always: true },
+    ...(hasAbout ? [{ id: "sobre", label: "Sobre", always: true }] : []),
     ...(hasProducts ? [{ id: "produtos", label: "Produtos", always: false }] : []),
     ...(hasServices ? [{ id: "servicos", label: "Servicos", always: false }] : []),
   ];
@@ -173,31 +182,35 @@ export default function LinkPage() {
             </div>
 
             <div className="flex items-center gap-2">
-              <nav className="hidden sm:flex items-center gap-1" data-testid="nav-linkpage-desktop">
-                {menuItems.map(item => (
-                  <button
-                    key={item.id}
-                    onClick={() => setActiveSection(item.id)}
-                    className="px-3 py-1.5 rounded-md text-sm font-medium transition-colors"
-                    style={{
-                      backgroundColor: activeSection === item.id ? primary : "transparent",
-                      color: activeSection === item.id ? "#fff" : "rgba(255,255,255,0.8)",
-                    }}
-                    data-testid={`button-linkpage-menu-${item.id}`}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </nav>
+              {menuItems.length > 0 && (
+                <nav className="hidden sm:flex items-center gap-1" data-testid="nav-linkpage-desktop">
+                  {menuItems.map(item => (
+                    <button
+                      key={item.id}
+                      onClick={() => setActiveSection(item.id)}
+                      className="px-3 py-1.5 rounded-md text-sm font-medium transition-colors"
+                      style={{
+                        backgroundColor: activeSection === item.id ? primary : "transparent",
+                        color: activeSection === item.id ? "#fff" : "rgba(255,255,255,0.8)",
+                      }}
+                      data-testid={`button-linkpage-menu-${item.id}`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </nav>
+              )}
 
-              <button
-                className="sm:hidden flex items-center gap-1 text-sm"
-                onClick={() => setMenuOpen(!menuOpen)}
-                data-testid="button-linkpage-mobile-menu"
-              >
-                {menuItems.find(m => m.id === activeSection)?.label}
-                <ChevronDown className="w-4 h-4" style={{ transform: menuOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }} />
-              </button>
+              {menuItems.length > 0 && (
+                <button
+                  className="sm:hidden flex items-center gap-1 text-sm"
+                  onClick={() => setMenuOpen(!menuOpen)}
+                  data-testid="button-linkpage-mobile-menu"
+                >
+                  {menuItems.find(m => m.id === activeSection)?.label}
+                  <ChevronDown className="w-4 h-4" style={{ transform: menuOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }} />
+                </button>
+              )}
 
               <button
                 onClick={toggleTheme}
