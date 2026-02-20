@@ -45,8 +45,23 @@ import { ptBR } from "date-fns/locale";
 import { StatusBadge } from "@/components/status-badge";
 import { PlatformIcon } from "@/components/platform-icon";
 import type { ApprovalPost, Client, Competitor } from "@shared/schema";
+import { CARD_TYPE_LABELS, CARD_TYPE_COLORS } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
+
+interface ClientSummary {
+  columns: { id: number; title: string; count: number }[];
+  recentCards: { id: number; title: string; cardType: string; columnTitle: string; updatedAt: string }[];
+  totalCards: number;
+  pendingApproval: number;
+  approved: number;
+  revision: number;
+  rejected: number;
+  scheduled: number;
+  posted: number;
+  finished: number;
+  inProgress: number;
+}
 
 interface InsightsData {
   approvalRate: number;
@@ -105,10 +120,15 @@ export default function Dashboard() {
     queryKey: ["/api/competitors"],
     refetchInterval: 30000,
   });
+  const { data: clientSummary, isLoading: clientSummaryLoading } = useQuery<ClientSummary>({
+    queryKey: ["/api/dashboard/client-summary"],
+    enabled: user?.role === "client",
+    refetchInterval: 30000,
+  });
 
   const [selectedHashtagCategory, setSelectedHashtagCategory] = useState("marketing");
 
-  const isLoading = postsLoading || approvalsLoading || clientsLoading || insightsLoading;
+  const isLoading = postsLoading || approvalsLoading || clientsLoading || insightsLoading || (user?.role === "client" && clientSummaryLoading);
   const userRole = user?.role || "admin";
 
   if (isLoading) {
@@ -142,10 +162,10 @@ export default function Dashboard() {
   const COLORS = ['hsl(135, 55%, 58%)', 'hsl(210, 60%, 55%)', 'hsl(280, 50%, 55%)', 'hsl(30, 80%, 55%)', 'hsl(350, 70%, 55%)', 'hsl(170, 50%, 50%)', 'hsl(45, 80%, 55%)'];
 
   const mainStats = userRole === "client" ? [
-    { label: "Total Aprovações", value: totalApprovals, icon: CheckSquare, accent: false },
-    { label: "Pendentes", value: pendingApprovals, icon: Clock, accent: pendingApprovals > 0 },
-    { label: "Aprovadas", value: approvedApprovals, icon: CheckCircle2, accent: false },
-    { label: "Em Revisão", value: revisionApprovals, icon: AlertCircle, accent: false },
+    { label: "Total Materiais", value: clientSummary?.totalCards || 0, icon: FileEdit, accent: false },
+    { label: "Em Aprovação", value: clientSummary?.pendingApproval || 0, icon: Clock, accent: (clientSummary?.pendingApproval || 0) > 0 },
+    { label: "Aprovados", value: clientSummary?.approved || 0, icon: CheckCircle2, accent: false },
+    { label: "Agendados", value: (clientSummary?.scheduled || 0) + (clientSummary?.posted || 0), icon: CalendarDays, accent: false },
   ] : [
     { label: "Total Posts", value: totalPosts, icon: TrendingUp, accent: false },
     { label: "Publicados", value: published, icon: CheckCircle2, accent: true },
@@ -214,39 +234,79 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="pt-5 pb-5 flex items-center gap-4">
-            <div className="w-11 h-11 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/20 flex items-center justify-center">
-              <Percent className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{approvalRate}%</p>
-              <p className="text-xs text-muted-foreground">Taxa de Aprovação</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-5 pb-5 flex items-center gap-4">
-            <div className="w-11 h-11 rounded-xl bg-amber-500/10 dark:bg-amber-500/20 flex items-center justify-center">
-              <CheckSquare className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{pendingApprovals}</p>
-              <p className="text-xs text-muted-foreground">Aprovações Pendentes</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-5 pb-5 flex items-center gap-4">
-            <div className="w-11 h-11 rounded-xl bg-rose-500/10 dark:bg-rose-500/20 flex items-center justify-center">
-              <AlertCircle className="w-5 h-5 text-rose-500 dark:text-rose-400" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{revisionApprovals}</p>
-              <p className="text-xs text-muted-foreground">Em Revisão</p>
-            </div>
-          </CardContent>
-        </Card>
+        {userRole === "client" ? (
+          <>
+            <Card>
+              <CardContent className="pt-5 pb-5 flex items-center gap-4">
+                <div className="w-11 h-11 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex items-center justify-center">
+                  <Activity className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{clientSummary?.inProgress || 0}</p>
+                  <p className="text-xs text-muted-foreground">Em Produção</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-5 pb-5 flex items-center gap-4">
+                <div className="w-11 h-11 rounded-xl bg-orange-500/10 dark:bg-orange-500/20 flex items-center justify-center">
+                  <AlertCircle className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{clientSummary?.revision || 0}</p>
+                  <p className="text-xs text-muted-foreground">Em Revisão</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-5 pb-5 flex items-center gap-4">
+                <div className="w-11 h-11 rounded-xl bg-green-500/10 dark:bg-green-500/20 flex items-center justify-center">
+                  <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{clientSummary?.finished || 0}</p>
+                  <p className="text-xs text-muted-foreground">Finalizados</p>
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        ) : (
+          <>
+            <Card>
+              <CardContent className="pt-5 pb-5 flex items-center gap-4">
+                <div className="w-11 h-11 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/20 flex items-center justify-center">
+                  <Percent className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{approvalRate}%</p>
+                  <p className="text-xs text-muted-foreground">Taxa de Aprovação</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-5 pb-5 flex items-center gap-4">
+                <div className="w-11 h-11 rounded-xl bg-amber-500/10 dark:bg-amber-500/20 flex items-center justify-center">
+                  <CheckSquare className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{pendingApprovals}</p>
+                  <p className="text-xs text-muted-foreground">Aprovações Pendentes</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-5 pb-5 flex items-center gap-4">
+                <div className="w-11 h-11 rounded-xl bg-rose-500/10 dark:bg-rose-500/20 flex items-center justify-center">
+                  <AlertCircle className="w-5 h-5 text-rose-500 dark:text-rose-400" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{revisionApprovals}</p>
+                  <p className="text-xs text-muted-foreground">Em Revisão</p>
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -445,45 +505,91 @@ export default function Dashboard() {
         </div>
       )}
 
-      {userRole === "client" && (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2 pb-4">
-            <CardTitle className="text-base font-semibold">Postagens Recentes</CardTitle>
-            <Link href="/approvals" className="inline-flex items-center text-xs font-medium text-muted-foreground transition-colors" data-testid="link-view-all-approvals">
-              Ver todas <ArrowRight className="w-3 h-3 ml-1" />
-            </Link>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {recentApprovals.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground text-sm">
-                Nenhuma postagem para aprovação.
-              </div>
-            ) : (
-              recentApprovals.map((approval) => (
-                <Link key={approval.id} href="/approvals">
-                  <div
-                    className="flex items-center justify-between gap-3 p-3 rounded-xl bg-muted/40 hover-elevate transition-colors"
-                    data-testid={`approval-row-${approval.id}`}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-xl bg-muted overflow-hidden flex-shrink-0">
-                        <img src={approval.imageUrl} alt="" className="w-full h-full object-cover" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">{approval.title}</p>
-                        <p className="text-xs text-muted-foreground truncate">{approval.clientName}</p>
-                      </div>
+      {userRole === "client" && clientSummary && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader className="pb-4">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <Activity className="w-4 h-4 text-muted-foreground" />
+                Status dos Materiais
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {[
+                  { label: "Em produção", value: clientSummary.inProgress, color: "bg-blue-500" },
+                  { label: "Em aprovação", value: clientSummary.pendingApproval, color: "bg-amber-500" },
+                  { label: "Aprovados", value: clientSummary.approved, color: "bg-emerald-500" },
+                  { label: "Em revisão", value: clientSummary.revision, color: "bg-orange-500" },
+                  { label: "Reprovados", value: clientSummary.rejected, color: "bg-red-500" },
+                  { label: "Agendados", value: clientSummary.scheduled, color: "bg-cyan-500" },
+                  { label: "Postados", value: clientSummary.posted, color: "bg-green-600" },
+                  { label: "Finalizados", value: clientSummary.finished, color: "bg-gray-500" },
+                ].filter(item => item.value > 0).map(item => (
+                  <div key={item.label} className="flex items-center justify-between gap-3" data-testid={`client-status-${item.label}`}>
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className={`w-2.5 h-2.5 rounded-full ${item.color} flex-shrink-0`} />
+                      <span className="text-sm text-foreground">{item.label}</span>
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <ApprovalStatusIcon status={approval.status} />
-                      <span className="text-xs text-muted-foreground">{approval.status}</span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-24 h-2 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${item.color}`}
+                          style={{ width: `${Math.min(100, (item.value / (clientSummary.totalCards || 1)) * 100)}%` }}
+                        />
+                      </div>
+                      <span className="text-sm font-semibold w-8 text-right">{item.value}</span>
                     </div>
                   </div>
-                </Link>
-              ))
-            )}
-          </CardContent>
-        </Card>
+                ))}
+                {clientSummary.totalCards === 0 && (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    Nenhum material encontrado.
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-4">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <FileEdit className="w-4 h-4 text-muted-foreground" />
+                Materiais Recentes
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {(clientSummary.recentCards || []).length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  Nenhum material recente.
+                </div>
+              ) : (
+                clientSummary.recentCards.map((card) => {
+                  const typeColor = CARD_TYPE_COLORS[card.cardType as keyof typeof CARD_TYPE_COLORS] || "gray";
+                  const typeLabel = CARD_TYPE_LABELS[card.cardType as keyof typeof CARD_TYPE_LABELS] || card.cardType;
+                  return (
+                    <div
+                      key={card.id}
+                      className="flex items-center justify-between gap-3 p-3 rounded-xl bg-muted/40 transition-colors"
+                      data-testid={`client-card-${card.id}`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={`w-1 h-10 rounded-full bg-${typeColor}-500 flex-shrink-0`} />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{card.title}</p>
+                          <p className="text-xs text-muted-foreground truncate">{typeLabel}</p>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="text-[11px] flex-shrink-0">
+                        {card.columnTitle}
+                      </Badge>
+                    </div>
+                  );
+                })
+              )}
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

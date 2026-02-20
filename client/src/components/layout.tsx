@@ -341,9 +341,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { name: "Calendário", href: "/calendar", icon: CalendarDays },
   ];
 
-  const postsNav: { name: string; href: string; icon: any }[] = [
-    { name: "Agendamentos", href: "/posts", icon: CalendarCheck },
-  ];
+  const postsNav: { name: string; href: string; icon: any }[] = [];
 
   const briefingNav = [
     { name: "Briefings", href: "/briefings", icon: ClipboardList },

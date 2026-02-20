@@ -1118,6 +1118,76 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
+  // === CLIENT DASHBOARD SUMMARY ===
+
+  app.get("/api/dashboard/client-summary", requireAuth, async (req, res) => {
+    try {
+      const user = await getCurrentUser(req);
+      if (!user) return res.status(401).json({ message: "Não autenticado" });
+
+      const clientId = user.role === "client" ? user.clientId : null;
+      if (!clientId) return res.json({ columns: [], recentCards: [], totalCards: 0 });
+
+      const columns = await storage.getKanbanColumnsByClient(clientId);
+      const cards = await storage.getKanbanCardsByClient(clientId);
+
+      const columnMap = new Map(columns.map(c => [c.id, c.title]));
+      const sortedColumns = [...columns].sort((a, b) => a.position - b.position);
+
+      const columnSummary = sortedColumns.map(col => {
+        const colCards = cards.filter(c => c.columnId === col.id);
+        return {
+          id: col.id,
+          title: col.title,
+          count: colCards.length,
+        };
+      });
+
+      const recentCards = [...cards]
+        .sort((a, b) => new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime())
+        .slice(0, 10)
+        .map(card => ({
+          id: card.id,
+          title: card.title,
+          cardType: card.cardType,
+          columnTitle: columnMap.get(card.columnId) || "",
+          updatedAt: card.updatedAt || card.createdAt,
+        }));
+
+      const pendingApproval = cards.filter(c => columnMap.get(c.columnId) === "Em Aprovação").length;
+      const approved = cards.filter(c => columnMap.get(c.columnId) === "Aprovados").length;
+      const revision = cards.filter(c => columnMap.get(c.columnId) === "Revisão").length;
+      const rejected = cards.filter(c => columnMap.get(c.columnId) === "Reprovados").length;
+      const scheduled = cards.filter(c => {
+        const t = columnMap.get(c.columnId);
+        return t === "Agendados" || t === "Agendamento";
+      }).length;
+      const posted = cards.filter(c => columnMap.get(c.columnId) === "Postados").length;
+      const finished = cards.filter(c => columnMap.get(c.columnId) === "Finalizados").length;
+      const inProgress = cards.filter(c => {
+        const t = columnMap.get(c.columnId);
+        return t === "Fila" || t === "Desenvolvendo Design" || t === "Desenvolvendo Copy";
+      }).length;
+
+      res.json({
+        columns: columnSummary,
+        recentCards,
+        totalCards: cards.length,
+        pendingApproval,
+        approved,
+        revision,
+        rejected,
+        scheduled,
+        posted,
+        finished,
+        inProgress,
+      });
+    } catch (err) {
+      console.error("Error getting client dashboard summary:", err);
+      res.status(500).json({ message: "Erro ao buscar resumo do dashboard" });
+    }
+  });
+
   // === DASHBOARD INSIGHTS ===
 
   app.get("/api/insights/overview", requireAuth, async (req, res) => {
