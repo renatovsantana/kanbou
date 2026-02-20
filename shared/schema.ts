@@ -281,6 +281,7 @@ export const DEFAULT_KANBAN_COLUMNS = [
   "Revisão",
   "Aprovados",
   "Reprovados",
+  "Agendamento",
   "Agendados",
   "Postados",
   "Finalizados",
@@ -514,9 +515,9 @@ export const APPROVAL_STATUS_TO_COLUMN: Record<string, string> = {
   "Refeito": "Em Aprovação",
 };
 
-export const PROTECTED_KANBAN_COLUMNS = ["Fila", "Em Aprovação", "Aprovados", "Reprovados", "Revisão", "Agendados", "Postados", "Finalizados"];
+export const PROTECTED_KANBAN_COLUMNS = ["Fila", "Em Aprovação", "Aprovados", "Reprovados", "Revisão", "Agendamento", "Agendados", "Postados", "Finalizados"];
 
-export const FIXED_KANBAN_COLUMNS = ["Em Aprovação", "Aprovados", "Reprovados", "Revisão", "Agendados", "Postados", "Finalizados"];
+export const FIXED_KANBAN_COLUMNS = ["Em Aprovação", "Aprovados", "Reprovados", "Revisão", "Agendamento", "Agendados", "Postados", "Finalizados"];
 
 export const clientProducts = pgTable("client_products", {
   id: serial("id").primaryKey(),

@@ -2026,13 +2026,14 @@ export async function registerRoutes(
       const toCol = columns.find(c => c.id === toColumnId);
 
       const allowedManualMoves: Record<string, string[]> = {
-        "Aprovados": ["Agendados", "Postados"],
+        "Aprovados": ["Agendamento", "Postados"],
+        "Agendamento": ["Agendados", "Postados", "Finalizados"],
         "Agendados": ["Postados", "Finalizados"],
         "Postados": ["Finalizados"],
       };
 
-      const restrictedFromColumns = ["Em Aprovação", "Aprovados", "Agendados", "Postados"];
-      const restrictedToColumns = ["Aprovados", "Reprovados", "Agendados", "Postados", "Finalizados"];
+      const restrictedFromColumns = ["Em Aprovação", "Aprovados", "Agendamento", "Agendados", "Postados"];
+      const restrictedToColumns = ["Aprovados", "Reprovados", "Agendamento", "Agendados", "Postados", "Finalizados"];
 
       if (fromCol && restrictedFromColumns.includes(fromCol.title)) {
         const allowed = allowedManualMoves[fromCol.title] || [];

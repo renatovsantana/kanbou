@@ -87,6 +87,7 @@ import {
   ArrowDown,
   Settings2,
   AlertTriangle,
+  CalendarCheck,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -115,9 +116,13 @@ const CARD_TYPE_ACCENT: Record<string, string> = {
 function SortableCard({
   card,
   onCardClick,
+  columnTitle,
+  onScheduleCard,
 }: {
   card: KanbanCard;
   onCardClick: (card: KanbanCard) => void;
+  columnTitle?: string;
+  onScheduleCard?: (card: KanbanCard) => void;
 }) {
   const {
     attributes,
@@ -259,6 +264,20 @@ function SortableCard({
               </div>
             )}
           </div>
+
+          {columnTitle === "Agendamento" && onScheduleCard && (
+            <button
+              className="w-full mt-2 flex items-center justify-center gap-1.5 text-xs font-semibold py-1.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                onScheduleCard(card);
+              }}
+              data-testid={`button-schedule-card-${card.id}`}
+            >
+              <CalendarCheck className="w-3.5 h-3.5" />
+              Agendar
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -294,7 +313,7 @@ function CardPreview({ card }: { card: KanbanCard }) {
   );
 }
 
-const OVERDUE_COLUMN = "Agendados";
+const OVERDUE_COLUMN = "Agendamento";
 
 function isCardOverdue(card: KanbanCard): boolean {
   if (card.cardType !== "post") return false;
@@ -321,6 +340,7 @@ function DroppableColumn({
   onAddCard,
   onRenameColumn,
   onDeleteColumn,
+  onScheduleCard,
 }: {
   column: KanbanColumn;
   cards: KanbanCard[];
@@ -328,6 +348,7 @@ function DroppableColumn({
   onAddCard: (columnId: number, data: { title: string; cardType: string; templateData: string }) => void;
   onRenameColumn: (columnId: number, title: string) => void;
   onDeleteColumn: (column: KanbanColumn) => void;
+  onScheduleCard?: (card: KanbanCard) => void;
 }) {
   const { setNodeRef } = useDroppable({ id: `column-${column.id}` });
   const [isEditing, setIsEditing] = useState(false);
@@ -437,7 +458,7 @@ function DroppableColumn({
         >
           <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
             {normalCards.map((card) => (
-              <SortableCard key={card.id} card={card} onCardClick={onCardClick} />
+              <SortableCard key={card.id} card={card} onCardClick={onCardClick} columnTitle={column.title} onScheduleCard={onScheduleCard} />
             ))}
             {overdueCards.length > 0 && (
               <>
@@ -450,7 +471,7 @@ function DroppableColumn({
                   <div className="h-px flex-1 bg-destructive/30" />
                 </div>
                 {overdueCards.map((card) => (
-                  <SortableCard key={card.id} card={card} onCardClick={onCardClick} />
+                  <SortableCard key={card.id} card={card} onCardClick={onCardClick} columnTitle={column.title} onScheduleCard={onScheduleCard} />
                 ))}
               </>
             )}
@@ -870,6 +891,7 @@ export default function KanbanBoard() {
   const [newColumnTitle, setNewColumnTitle] = useState("");
   const newColRef = useRef<HTMLInputElement>(null);
   const [pendingApprovalMove, setPendingApprovalMove] = useState<{ cardId: number; toColumnId: number; newPosition: number } | null>(null);
+  const [scheduleConfirmCard, setScheduleConfirmCard] = useState<KanbanCard | null>(null);
   const { collapsed, setCollapsed } = useSidebarCollapse();
 
   const { data: clients = [], isLoading: loadingClients } = useQuery<Client[]>({
@@ -1035,6 +1057,29 @@ export default function KanbanBoard() {
     createColumnMutation.mutate({ title: trimmed, position: maxPos });
   };
 
+  const handleConfirmSchedule = async () => {
+    if (!scheduleConfirmCard) return;
+    const agendadosCol = columns.find(c => c.title === "Agendados");
+    if (!agendadosCol) {
+      toast({ title: "Erro", description: "Coluna 'Agendados' não encontrada.", variant: "destructive" });
+      setScheduleConfirmCard(null);
+      return;
+    }
+    try {
+      const cardsInTarget = cardsByColumn[agendadosCol.id] || [];
+      const newPos = cardsInTarget.length;
+      await apiRequest("PATCH", `/api/kanban/cards/${scheduleConfirmCard.id}`, {
+        columnId: agendadosCol.id,
+        position: newPos,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/kanban", clientId, "cards"] });
+      toast({ title: "Agendado!", description: `"${scheduleConfirmCard.title}" foi movido para Agendados.` });
+    } catch (err: any) {
+      toast({ title: "Erro", description: err?.message || "Não foi possível agendar.", variant: "destructive" });
+    }
+    setScheduleConfirmCard(null);
+  };
+
   const findColumnIdFromCardId = (id: string): number | null => {
     const numId = Number(id.replace("card-", ""));
     const card = cards.find((c) => c.id === numId);
@@ -1175,6 +1220,7 @@ export default function KanbanBoard() {
                   onAddCard={handleAddCard}
                   onRenameColumn={handleRenameColumn}
                   onDeleteColumn={handleDeleteColumn}
+                  onScheduleCard={setScheduleConfirmCard}
                 />
               ))}
 
@@ -1278,6 +1324,26 @@ export default function KanbanBoard() {
               data-testid="button-confirm-approval-move"
             >
               Confirmar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!scheduleConfirmCard} onOpenChange={(open) => { if (!open) setScheduleConfirmCard(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar agendamento</AlertDialogTitle>
+            <AlertDialogDescription>
+              Você realmente já agendou a postagem de "{scheduleConfirmCard?.title}"? Ao confirmar, o cartão será movido para a coluna "Agendados".
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-schedule">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmSchedule}
+              data-testid="button-confirm-schedule"
+            >
+              Sim, já agendei
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

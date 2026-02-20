@@ -29,6 +29,7 @@ import {
   Loader2,
   Settings,
   Lightbulb,
+  CalendarCheck,
 } from "lucide-react";
 import { useState, useMemo, useEffect, useRef, useCallback, createContext, useContext } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -340,7 +341,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { name: "Calendário", href: "/calendar", icon: CalendarDays },
   ];
 
-  const postsNav: { name: string; href: string; icon: any }[] = [];
+  const postsNav: { name: string; href: string; icon: any }[] = [
+    { name: "Agendamentos", href: "/posts", icon: CalendarCheck },
+  ];
 
   const briefingNav = [
     { name: "Briefings", href: "/briefings", icon: ClipboardList },
