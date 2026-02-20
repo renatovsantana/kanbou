@@ -2174,6 +2174,7 @@ export async function registerRoutes(
     const updated = await storage.updateKanbanCard(cardId, {
       approvalStatus: "Pendente",
       approvalNotes: null,
+      approvalResolvedAt: null,
     });
 
     const moved = await moveCardToColumn(updated, "Em Aprovação", user?.id);
