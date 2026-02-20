@@ -55,7 +55,7 @@ export const posts = pgTable("posts", {
   content: text("content"),
   platform: text("platform").array().notNull(),
   scheduledDate: timestamp("scheduled_date").notNull(),
-  status: text("status").notNull().default("Rascunho"),
+  status: text("status").notNull().default("Agendado"),
   mediaUrl: text("media_url"),
   mediaUrls: text("media_urls").array(),
   approvalPostId: integer("approval_post_id"),

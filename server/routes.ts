@@ -808,7 +808,7 @@ export async function registerRoutes(
         scheduledDate: z.string().optional(),
         platform: z.array(z.string()).optional(),
         content: z.string().optional(),
-        status: z.enum(["Agendado", "Rascunho"]).optional(),
+        status: z.enum(["Agendado"]).optional(),
         notes: z.string().optional(),
       });
       const parsed = importSchema.safeParse(req.body);
@@ -867,7 +867,7 @@ export async function registerRoutes(
         scheduledDate: z.string(),
         platform: z.array(z.string()).min(1, "Selecione ao menos uma plataforma"),
         content: z.string().optional(),
-        status: z.enum(["Agendado", "Rascunho"]).optional(),
+        status: z.enum(["Agendado"]).optional(),
         notes: z.string().optional(),
       });
       const parsed = importSchema.safeParse(req.body);
@@ -933,6 +933,59 @@ export async function registerRoutes(
     } catch (err) {
       console.error("Error importing kanban card to post:", err);
       res.status(500).json({ message: "Erro ao importar card para posts" });
+    }
+  });
+
+  app.get("/api/kanban/scheduled-cards", requireAuth, async (req, res) => {
+    try {
+      const user = await getCurrentUser(req);
+      if (!user) return res.status(401).json({ message: "Não autenticado" });
+
+      const scheduledData = await storage.getScheduledKanbanCards();
+
+      let filtered = scheduledData;
+      if (user.role === "client" && user.clientId) {
+        filtered = scheduledData.filter(d => d.card.clientId === user.clientId);
+      }
+
+      const allClients = await storage.getClients();
+      const clientMap = new Map(allClients.map(c => [c.id, c.name]));
+
+      const result = filtered.map(({ card, columnTitle }) => {
+        let templateObj: Record<string, string> = {};
+        try { if (card.templateData) templateObj = JSON.parse(card.templateData as string); } catch {}
+
+        let platforms: string[] = [];
+        try {
+          if (templateObj.platform) {
+            const parsed = JSON.parse(templateObj.platform);
+            platforms = Array.isArray(parsed) ? parsed : [parsed];
+          }
+        } catch {
+          if (templateObj.platform) platforms = [templateObj.platform];
+        }
+
+        const isConfirmedScheduled = columnTitle === "Agendados";
+
+        return {
+          id: `kanban-${card.id}`,
+          kanbanCardId: card.id,
+          title: templateObj.postTitle || templateObj.headline || card.title,
+          clientId: card.clientId,
+          clientName: clientMap.get(card.clientId) || "Cliente",
+          content: templateObj.caption || card.description || "",
+          platform: platforms,
+          scheduledDate: templateObj.publishDate || card.createdAt,
+          status: isConfirmedScheduled ? "Agendado" : "Aguardando Agendamento",
+          cardType: card.cardType,
+          source: "kanban" as const,
+        };
+      });
+
+      res.json(result);
+    } catch (err) {
+      console.error("Error getting scheduled kanban cards:", err);
+      res.status(500).json({ message: "Erro ao buscar cards agendados" });
     }
   });
 
@@ -2269,7 +2322,7 @@ export async function registerRoutes(
         content: content,
         platform: platform,
         scheduledDate: scheduledDate,
-        status: "Rascunho",
+        status: "Agendado",
         mediaUrl: mediaUrl,
         mediaUrls: mediaUrls && mediaUrls.length > 0 ? mediaUrls : null,
         notes: postNotes,
@@ -3257,7 +3310,7 @@ async function seedDatabase() {
         content: "5 dicas para proteger seus dados online.",
         platform: ["LinkedIn"],
         scheduledDate: new Date(now.getTime() + 86400000 * 2),
-        status: "Rascunho",
+        status: "Agendado",
         notes: "Pesquisar mais estatísticas",
       });
 

@@ -464,7 +464,6 @@ export default function PostList() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos os Status</SelectItem>
-              <SelectItem value="Rascunho">Rascunho</SelectItem>
               <SelectItem value="Agendado">Agendado</SelectItem>
               <SelectItem value="Publicado">Publicado</SelectItem>
               <SelectItem value="Cancelado">Cancelado</SelectItem>
@@ -492,7 +491,7 @@ export default function PostList() {
             const statusCounts = {
               Agendado: group.posts.filter(p => p.status === "Agendado").length,
               Publicado: group.posts.filter(p => p.status === "Publicado").length,
-              Rascunho: group.posts.filter(p => p.status === "Rascunho").length,
+              Cancelado: group.posts.filter(p => p.status === "Cancelado").length,
             };
             return (
               <div key={group.clientName} data-testid={`group-client-${group.clientName}`}>
@@ -902,7 +901,6 @@ export default function PostList() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="Agendado">Agendado</SelectItem>
-                        <SelectItem value="Rascunho">Rascunho</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

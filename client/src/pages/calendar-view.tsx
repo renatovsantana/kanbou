@@ -12,14 +12,31 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
-import { CalendarDays, Filter, ListFilter, AlertTriangle, Clock } from "lucide-react";
+import { CalendarDays, Filter, ListFilter, AlertTriangle, Clock, Kanban } from "lucide-react";
 import type { Client } from "@shared/schema";
+
+interface CalendarItem {
+  id: string | number;
+  title: string;
+  clientId: number;
+  clientName: string;
+  content?: string;
+  platform: string[];
+  scheduledDate: string;
+  status: string;
+  notes?: string;
+  source: "post" | "kanban";
+  cardType?: string;
+}
 
 export default function CalendarView() {
   const { user } = useAuth();
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [month, setMonth] = useState<Date>(new Date());
-  const { data: posts, isLoading } = usePosts();
+  const { data: posts, isLoading: postsLoading } = usePosts();
+  const { data: scheduledCards = [], isLoading: cardsLoading } = useQuery<any[]>({
+    queryKey: ["/api/kanban/scheduled-cards"],
+  });
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["/api/clients"] });
   const [activeTab, setActiveTab] = useState("calendar");
 
@@ -27,92 +44,153 @@ export default function CalendarView() {
   const [platformFilter, setPlatformFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
-  const filteredPosts = useMemo(() => {
-    if (!posts) return [];
-    return posts.filter(post => {
-      if (clientFilter !== "all" && String(post.clientId) !== clientFilter) return false;
-      if (statusFilter !== "all" && post.status !== statusFilter) return false;
+  const isLoading = postsLoading || cardsLoading;
+
+  const allItems = useMemo(() => {
+    const items: CalendarItem[] = [];
+
+    if (posts) {
+      for (const post of posts) {
+        items.push({
+          id: post.id,
+          title: post.title || "",
+          clientId: post.clientId ?? 0,
+          clientName: post.clientName || "",
+          content: post.content || "",
+          platform: Array.isArray(post.platform) ? post.platform : [post.platform],
+          scheduledDate: String(post.scheduledDate),
+          status: post.status,
+          notes: post.notes || "",
+          source: "post",
+        });
+      }
+    }
+
+    if (scheduledCards) {
+      const postKanbanIds = new Set(
+        (posts || [])
+          .filter((p: any) => p.kanbanCardId)
+          .map((p: any) => p.kanbanCardId)
+      );
+
+      for (const card of scheduledCards) {
+        if (postKanbanIds.has(card.kanbanCardId)) continue;
+        items.push({
+          id: card.id,
+          title: card.title || "",
+          clientId: card.clientId,
+          clientName: card.clientName || "",
+          content: card.content || "",
+          platform: Array.isArray(card.platform) ? card.platform : card.platform ? [card.platform] : [],
+          scheduledDate: card.scheduledDate,
+          status: card.status,
+          source: "kanban",
+          cardType: card.cardType,
+        });
+      }
+    }
+
+    return items;
+  }, [posts, scheduledCards]);
+
+  const filteredItems = useMemo(() => {
+    return allItems.filter(item => {
+      if (clientFilter !== "all" && String(item.clientId) !== clientFilter) return false;
+      if (statusFilter !== "all" && item.status !== statusFilter) return false;
       if (platformFilter !== "all") {
-        const platforms = Array.isArray(post.platform) ? post.platform : [post.platform];
-        if (!platforms.includes(platformFilter)) return false;
+        if (!item.platform.includes(platformFilter)) return false;
       }
       return true;
     });
-  }, [posts, clientFilter, platformFilter, statusFilter]);
+  }, [allItems, clientFilter, platformFilter, statusFilter]);
 
-  const postsForSelectedDate = useMemo(() => {
-    return filteredPosts.filter(post =>
-      date && isSameDay(new Date(post.scheduledDate), date)
+  const itemsForSelectedDate = useMemo(() => {
+    return filteredItems.filter(item =>
+      date && item.scheduledDate && isSameDay(new Date(item.scheduledDate), date)
     );
-  }, [filteredPosts, date]);
+  }, [filteredItems, date]);
 
-  const scheduledPosts = useMemo(() => {
+  const scheduledItems = useMemo(() => {
     const today = startOfDay(new Date());
-    return filteredPosts
-      .filter(post => {
-        const postDate = new Date(post.scheduledDate);
-        return !isBefore(postDate, today);
+    return filteredItems
+      .filter(item => {
+        if (!item.scheduledDate) return false;
+        const itemDate = new Date(item.scheduledDate);
+        return !isBefore(itemDate, today);
       })
       .sort((a, b) => new Date(a.scheduledDate).getTime() - new Date(b.scheduledDate).getTime());
-  }, [filteredPosts]);
+  }, [filteredItems]);
 
-  const overduePosts = useMemo(() => {
+  const overdueItems = useMemo(() => {
     const today = startOfDay(new Date());
-    return filteredPosts
-      .filter(post => {
-        const postDate = new Date(post.scheduledDate);
-        return isBefore(postDate, today) && post.status !== "published" && post.status !== "Publicado";
+    return filteredItems
+      .filter(item => {
+        if (!item.scheduledDate) return false;
+        const itemDate = new Date(item.scheduledDate);
+        return isBefore(itemDate, today) && item.status !== "Publicado" && item.status !== "published";
       })
       .sort((a, b) => new Date(a.scheduledDate).getTime() - new Date(b.scheduledDate).getTime());
-  }, [filteredPosts]);
+  }, [filteredItems]);
 
   const uniqueStatuses = useMemo(() => {
-    if (!posts) return [];
-    return Array.from(new Set(posts.map(p => p.status)));
-  }, [posts]);
+    return Array.from(new Set(allItems.map(i => i.status)));
+  }, [allItems]);
 
   const STATUS_LABELS: Record<string, string> = {
     scheduled: "Agendado",
     Agendado: "Agendado",
     published: "Publicado",
     Publicado: "Publicado",
-    draft: "Rascunho",
-    Rascunho: "Rascunho",
     pending: "Pendente",
     Pendente: "Pendente",
     approved: "Aprovado",
     Aprovado: "Aprovado",
     rejected: "Rejeitado",
     Rejeitado: "Rejeitado",
+    "Aguardando Agendamento": "Aguardando Agendamento",
   };
 
-  const renderPostCard = (post: any) => (
-    <div key={post.id} className="flex flex-col sm:flex-row gap-3 p-4 rounded-md bg-muted/30 hover-elevate transition-all" data-testid={`calendar-post-${post.id}`}>
+  const renderItemCard = (item: CalendarItem) => (
+    <div key={item.id} className="flex flex-col sm:flex-row gap-3 p-4 rounded-md bg-muted/30 hover-elevate transition-all" data-testid={`calendar-item-${item.id}`}>
       <div className="flex-shrink-0">
         <div className="w-11 h-11 rounded-md bg-card flex items-center justify-center gap-1 border border-border">
-          {(Array.isArray(post.platform) ? post.platform.slice(0, 3) : [post.platform]).map((p: string) => (
-            <PlatformIcon key={p} platform={p} />
-          ))}
+          {item.platform.length > 0 ? (
+            item.platform.slice(0, 3).map((p: string) => (
+              <PlatformIcon key={p} platform={p} />
+            ))
+          ) : (
+            <Kanban className="w-4 h-4 text-muted-foreground" />
+          )}
         </div>
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2 flex-wrap">
           <div>
-            <h4 className="font-semibold text-sm">{post.clientName}</h4>
-            <p className="text-sm text-muted-foreground">{post.title}</p>
+            <h4 className="font-semibold text-sm">{item.clientName}</h4>
+            <p className="text-sm text-muted-foreground">{item.title}</p>
           </div>
-          <StatusBadge status={post.status} />
+          <div className="flex items-center gap-1.5">
+            {item.source === "kanban" && (
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 no-default-hover-elevate no-default-active-elevate">
+                <Kanban className="w-3 h-3 mr-0.5" />
+                Kanban
+              </Badge>
+            )}
+            <StatusBadge status={item.status} />
+          </div>
         </div>
-        {post.content && (
-          <p className="mt-2 text-sm text-muted-foreground line-clamp-2">{post.content}</p>
+        {item.content && (
+          <p className="mt-2 text-sm text-muted-foreground line-clamp-2">{item.content}</p>
         )}
         <div className="mt-2 flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
-          <span className="flex items-center gap-1">
-            <CalendarDays className="w-3 h-3" />
-            {format(new Date(post.scheduledDate), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-          </span>
-          {post.notes && (
-            <span className="truncate max-w-[200px] block">Obs: {post.notes}</span>
+          {item.scheduledDate && (
+            <span className="flex items-center gap-1">
+              <CalendarDays className="w-3 h-3" />
+              {format(new Date(item.scheduledDate), "dd/MM/yyyy", { locale: ptBR })}
+            </span>
+          )}
+          {item.notes && (
+            <span className="truncate max-w-[200px] block">Obs: {item.notes}</span>
           )}
         </div>
       </div>
@@ -179,7 +257,7 @@ export default function CalendarView() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="section-title" data-testid="text-page-title">Calendário</h1>
-          <p className="section-subtitle">Visualize e filtre suas postagens por data.</p>
+          <p className="section-subtitle">Visualize e filtre seus agendamentos por data.</p>
         </div>
       </div>
 
@@ -194,15 +272,15 @@ export default function CalendarView() {
           <TabsTrigger value="scheduled" data-testid="tab-scheduled">
             <Clock className="w-4 h-4 mr-1.5" />
             Agendados
-            {scheduledPosts.length > 0 && (
-              <Badge variant="secondary" className="ml-1.5 text-[10px] no-default-hover-elevate no-default-active-elevate">{scheduledPosts.length}</Badge>
+            {scheduledItems.length > 0 && (
+              <Badge variant="secondary" className="ml-1.5 text-[10px] no-default-hover-elevate no-default-active-elevate">{scheduledItems.length}</Badge>
             )}
           </TabsTrigger>
-          {overduePosts.length > 0 && (
+          {overdueItems.length > 0 && (
             <TabsTrigger value="overdue" data-testid="tab-overdue">
               <AlertTriangle className="w-4 h-4 mr-1.5 text-destructive" />
               Atrasados
-              <Badge variant="destructive" className="ml-1.5 text-[10px] no-default-hover-elevate no-default-active-elevate">{overduePosts.length}</Badge>
+              <Badge variant="destructive" className="ml-1.5 text-[10px] no-default-hover-elevate no-default-active-elevate">{overdueItems.length}</Badge>
             </TabsTrigger>
           )}
         </TabsList>
@@ -221,7 +299,7 @@ export default function CalendarView() {
                     locale={ptBR}
                     className="rounded-md border-none shadow-none w-full flex justify-center"
                     modifiers={{
-                      hasPost: (d) => filteredPosts.some(p => isSameDay(new Date(p.scheduledDate), d)),
+                      hasPost: (d) => filteredItems.some(i => i.scheduledDate && isSameDay(new Date(i.scheduledDate), d)),
                     }}
                     modifiersStyles={{
                       hasPost: { fontWeight: 'bold', textDecoration: 'underline', color: 'hsl(135, 55%, 58%)' },
@@ -235,10 +313,10 @@ export default function CalendarView() {
               <Card className="h-full min-h-[500px]">
                 <CardHeader className="border-b border-border bg-muted/20 flex flex-row items-center justify-between gap-2">
                   <CardTitle className="text-base font-semibold">
-                    Posts para {date ? format(date, "dd 'de' MMMM", { locale: ptBR }) : "Data Selecionada"}
+                    Agendamentos para {date ? format(date, "dd 'de' MMMM", { locale: ptBR }) : "Data Selecionada"}
                   </CardTitle>
                   <Badge variant="secondary" className="text-xs no-default-hover-elevate no-default-active-elevate">
-                    {postsForSelectedDate.length} post{postsForSelectedDate.length !== 1 ? "s" : ""}
+                    {itemsForSelectedDate.length} item{itemsForSelectedDate.length !== 1 ? "s" : ""}
                   </Badge>
                 </CardHeader>
                 <CardContent className="p-5">
@@ -246,14 +324,14 @@ export default function CalendarView() {
                     <div className="flex justify-center p-8">
                       <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent"></div>
                     </div>
-                  ) : postsForSelectedDate.length === 0 ? (
+                  ) : itemsForSelectedDate.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-64 text-muted-foreground text-sm">
                       <CalendarDays className="w-10 h-10 mb-3 opacity-30" />
-                      <p>Nenhum post para este dia.</p>
+                      <p>Nenhum agendamento para este dia.</p>
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      {postsForSelectedDate.map(renderPostCard)}
+                      {itemsForSelectedDate.map(renderItemCard)}
                     </div>
                   )}
                 </CardContent>
@@ -267,10 +345,10 @@ export default function CalendarView() {
             <CardHeader className="border-b border-border bg-muted/20 flex flex-row items-center justify-between gap-2">
               <CardTitle className="text-base font-semibold flex items-center gap-2">
                 <ListFilter className="w-4 h-4" />
-                Posts Agendados
+                Agendamentos
               </CardTitle>
               <Badge variant="secondary" className="text-xs no-default-hover-elevate no-default-active-elevate">
-                {scheduledPosts.length} post{scheduledPosts.length !== 1 ? "s" : ""}
+                {scheduledItems.length} item{scheduledItems.length !== 1 ? "s" : ""}
               </Badge>
             </CardHeader>
             <CardContent className="p-5">
@@ -278,35 +356,35 @@ export default function CalendarView() {
                 <div className="flex justify-center p-8">
                   <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent"></div>
                 </div>
-              ) : scheduledPosts.length === 0 ? (
+              ) : scheduledItems.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-48 text-muted-foreground text-sm">
                   <Clock className="w-10 h-10 mb-3 opacity-30" />
-                  <p>Nenhum post agendado encontrado.</p>
+                  <p>Nenhum agendamento encontrado.</p>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {scheduledPosts.map(renderPostCard)}
+                  {scheduledItems.map(renderItemCard)}
                 </div>
               )}
             </CardContent>
           </Card>
         </TabsContent>
 
-        {overduePosts.length > 0 && (
+        {overdueItems.length > 0 && (
           <TabsContent value="overdue">
             <Card>
               <CardHeader className="border-b border-destructive/20 bg-destructive/5 flex flex-row items-center justify-between gap-2">
                 <CardTitle className="text-base font-semibold flex items-center gap-2 text-destructive">
                   <AlertTriangle className="w-4 h-4" />
-                  Posts com Agendamento Atrasado
+                  Agendamentos Atrasados
                 </CardTitle>
                 <Badge variant="destructive" className="text-xs no-default-hover-elevate no-default-active-elevate">
-                  {overduePosts.length} post{overduePosts.length !== 1 ? "s" : ""}
+                  {overdueItems.length} item{overdueItems.length !== 1 ? "s" : ""}
                 </Badge>
               </CardHeader>
               <CardContent className="p-5">
                 <div className="space-y-3">
-                  {overduePosts.map(renderPostCard)}
+                  {overdueItems.map(renderItemCard)}
                 </div>
               </CardContent>
             </Card>

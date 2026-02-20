@@ -1,10 +1,10 @@
 import { cn } from "@/lib/utils";
 
 const statusConfig = {
-  Rascunho: {
-    color: "bg-muted text-muted-foreground border-border",
-    dot: "bg-muted-foreground/50",
-    label: "Rascunho",
+  "Aguardando Agendamento": {
+    color: "bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300 border-orange-200 dark:border-orange-800",
+    dot: "bg-orange-500",
+    label: "Aguardando Agendamento",
   },
   Agendado: {
     color: "bg-primary/15 text-foreground border-primary/25",
@@ -49,7 +49,7 @@ const statusConfig = {
 } as const;
 
 export function StatusBadge({ status }: { status: string }) {
-  const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.Rascunho;
+  const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.Agendado;
 
   return (
     <span className={cn(

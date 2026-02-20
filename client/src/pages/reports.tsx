@@ -20,6 +20,10 @@ interface WorkflowReport {
   rejectedCount: number;
   revisionCount: number;
   pendingCount: number;
+  scheduledCount: number;
+  waitingScheduleCount: number;
+  postedCount: number;
+  finishedCount: number;
   avgApprovalTimeHours: number;
   cards: any[];
 }
@@ -366,7 +370,7 @@ export default function ReportsPage() {
                 </div>
               ) : workflowData ? (
                 <>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <Card data-testid="card-total">
                       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
                         <CardTitle className="text-sm font-medium">Total de Cards</CardTitle>
@@ -408,6 +412,42 @@ export default function ReportsPage() {
                       <CardContent>
                         <div className="text-2xl font-bold text-amber-600" data-testid="text-revision">
                           {workflowData.revisionCount}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <Card data-testid="card-scheduled">
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+                        <CardTitle className="text-sm font-medium">Agendados</CardTitle>
+                        <CalendarDays className="w-4 h-4 text-blue-500" />
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold text-blue-600" data-testid="text-scheduled">
+                          {workflowData.scheduledCount}
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card data-testid="card-waiting-schedule">
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+                        <CardTitle className="text-sm font-medium">Aguardando Agendamento</CardTitle>
+                        <Clock className="w-4 h-4 text-orange-500" />
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold text-orange-600" data-testid="text-waiting-schedule">
+                          {workflowData.waitingScheduleCount}
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card data-testid="card-posted">
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+                        <CardTitle className="text-sm font-medium">Postados</CardTitle>
+                        <Send className="w-4 h-4 text-purple-500" />
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold text-purple-600" data-testid="text-posted">
+                          {workflowData.postedCount}
                         </div>
                       </CardContent>
                     </Card>

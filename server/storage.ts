@@ -149,6 +149,7 @@ export interface IStorage {
   deleteKanbanComment(id: number): Promise<void>;
 
   getApprovedKanbanCards(): Promise<KanbanCard[]>;
+  getScheduledKanbanCards(): Promise<{ card: KanbanCard; columnTitle: string }[]>;
   getKanbanActivity(cardId: number): Promise<KanbanActivity[]>;
   createKanbanActivity(activity: { cardId: number; userId: number | null; action: string; fromColumnId?: number; toColumnId?: number; details?: string }): Promise<KanbanActivity>;
   getMovementReportData(filters?: { clientId?: number; userId?: number; startDate?: Date; endDate?: Date }): Promise<any>;
@@ -597,6 +598,21 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(kanbanCards).where(eq(kanbanCards.approvalStatus, "Aprovado"));
   }
 
+  async getScheduledKanbanCards(): Promise<{ card: KanbanCard; columnTitle: string }[]> {
+    const allColumns = await db.select().from(kanbanColumns);
+    const scheduledColumnIds = allColumns
+      .filter(c => c.title === "Agendados" || c.title === "Agendamento")
+      .map(c => c.id);
+    if (scheduledColumnIds.length === 0) return [];
+    const cards = await db.select().from(kanbanCards)
+      .where(inArray(kanbanCards.columnId, scheduledColumnIds));
+    const columnMap = new Map(allColumns.map(c => [c.id, c.title]));
+    return cards.map(card => ({
+      card,
+      columnTitle: columnMap.get(card.columnId) || "",
+    }));
+  }
+
   async getKanbanActivity(cardId: number): Promise<KanbanActivity[]> {
     return await db.select().from(kanbanActivity).where(eq(kanbanActivity.cardId, cardId)).orderBy(desc(kanbanActivity.createdAt));
   }
@@ -813,6 +829,13 @@ export class DatabaseStorage implements IStorage {
     let totalApprovalTimeMs = 0;
     let approvalTimeCount = 0;
 
+    const allColumns = await db.select().from(kanbanColumns);
+    const columnMap = new Map(allColumns.map(c => [c.id, c.title]));
+    let scheduledCount = 0;
+    let waitingScheduleCount = 0;
+    let postedCount = 0;
+    let finishedCount = 0;
+
     for (const card of cards) {
       const status = card.approvalStatus || "sem_aprovacao";
       byStatus[status] = (byStatus[status] || 0) + 1;
@@ -828,6 +851,12 @@ export class DatabaseStorage implements IStorage {
         totalApprovalTimeMs += new Date(card.approvalResolvedAt).getTime() - new Date(card.approvalSentAt).getTime();
         approvalTimeCount++;
       }
+
+      const colTitle = columnMap.get(card.columnId);
+      if (colTitle === "Agendados") scheduledCount++;
+      else if (colTitle === "Agendamento") waitingScheduleCount++;
+      else if (colTitle === "Postados") postedCount++;
+      else if (colTitle === "Finalizados") finishedCount++;
     }
 
     const avgApprovalTimeHours = approvalTimeCount > 0 ? totalApprovalTimeMs / approvalTimeCount / (1000 * 60 * 60) : 0;
@@ -841,6 +870,10 @@ export class DatabaseStorage implements IStorage {
       rejectedCount,
       revisionCount,
       pendingCount,
+      scheduledCount,
+      waitingScheduleCount,
+      postedCount,
+      finishedCount,
       avgApprovalTimeHours: Math.round(avgApprovalTimeHours * 10) / 10,
       cards,
     };

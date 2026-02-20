@@ -77,7 +77,7 @@ export function PostForm({ post, onSuccess, onCancel }: PostFormProps) {
       title: post?.title || "",
       content: post?.content || "",
       platform: post?.platform || [],
-      status: post?.status || "Rascunho",
+      status: post?.status || "Agendado",
       mediaUrl: post?.mediaUrl || "",
       notes: post?.notes || "",
       scheduledDate: post?.scheduledDate ? new Date(post.scheduledDate) : new Date(),
@@ -211,7 +211,6 @@ export function PostForm({ post, onSuccess, onCancel }: PostFormProps) {
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="Rascunho">Rascunho</SelectItem>
                     <SelectItem value="Agendado">Agendado</SelectItem>
                     <SelectItem value="Publicado">Publicado</SelectItem>
                     <SelectItem value="Cancelado">Cancelado</SelectItem>
