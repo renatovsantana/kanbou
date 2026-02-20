@@ -62,6 +62,7 @@ export default function InsightsPage() {
   const [message, setMessage] = useState("");
   const [insightToDelete, setInsightToDelete] = useState<number | null>(null);
   const [showComposer, setShowComposer] = useState(false);
+  const [confirmPublish, setConfirmPublish] = useState(false);
 
   const { data: clients = [] } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
@@ -97,7 +98,8 @@ export default function InsightsPage() {
     },
   });
 
-  const canDelete = user?.role === "admin" || user?.role === "designer";
+  const canDeleteAll = user?.role === "admin" || user?.role === "designer";
+  const canDeleteOwn = true;
   const postClientId = isClient
     ? (user?.clientId || null)
     : (selectedClientId !== "all" ? Number(selectedClientId) : null);
@@ -198,7 +200,7 @@ export default function InsightsPage() {
                 Cancelar
               </Button>
               <Button
-                onClick={() => message.trim() && createMutation.mutate({ clientId: postClientId, message: message.trim() })}
+                onClick={() => setConfirmPublish(true)}
                 disabled={!message.trim() || createMutation.isPending}
                 data-testid="button-send-insight"
               >
@@ -282,7 +284,7 @@ export default function InsightsPage() {
                           </div>
                         </div>
                       </div>
-                      {canDelete && (
+                      {(canDeleteAll || (canDeleteOwn && insight.userId === user?.id)) && (
                         <Button
                           variant="ghost"
                           size="icon"
@@ -321,6 +323,31 @@ export default function InsightsPage() {
               data-testid="button-confirm-delete-insight"
             >
               Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmPublish} onOpenChange={setConfirmPublish}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Publicar insight?</AlertDialogTitle>
+            <AlertDialogDescription>
+              O insight será publicado e visível para todos os envolvidos. Deseja continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (postClientId && message.trim()) {
+                  createMutation.mutate({ clientId: postClientId, message: message.trim() });
+                }
+                setConfirmPublish(false);
+              }}
+              data-testid="button-confirm-publish-insight"
+            >
+              Publicar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
