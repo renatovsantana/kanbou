@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { RichTextEditor } from "@/components/rich-text-editor";
+import { RichTextEditor, TextareaWithExtras } from "@/components/rich-text-editor";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -54,6 +54,7 @@ import {
   RotateCcw,
   Copy,
   Check,
+  Pencil,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -165,6 +166,8 @@ export function KanbanCardModal({ cardId, clientId, open, onClose, columnTitle }
   const [showScheduleConfirm, setShowScheduleConfirm] = useState(false);
   const [showBackToFilaConfirm, setShowBackToFilaConfirm] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [editingTemplateField, setEditingTemplateField] = useState<string | null>(null);
+  const [templateFieldValues, setTemplateFieldValues] = useState<Record<string, string>>({});
   const titleInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const coverFileInputRef = useRef<HTMLInputElement>(null);
@@ -196,6 +199,11 @@ export function KanbanCardModal({ cardId, clientId, open, onClose, columnTitle }
 
   const { data: columns = [] } = useQuery<KanbanColumn[]>({
     queryKey: ["/api/kanban", clientId, "columns"],
+    enabled: !!clientId && open,
+  });
+
+  const { data: textTemplates } = useQuery<{ id: number; name: string; content: string }[]>({
+    queryKey: [`/api/onboarding/${clientId}/text-templates`],
     enabled: !!clientId && open,
   });
 
@@ -709,46 +717,121 @@ export function KanbanCardModal({ cardId, clientId, open, onClose, columnTitle }
                       try {
                         if (card.templateData) templateObj = JSON.parse(card.templateData);
                       } catch {}
-                      const filledFields = fields.filter(f => {
-                        const val = templateObj[f.key];
-                        if (Array.isArray(val)) return val.length > 0;
-                        return !!val;
-                      });
-                      if (filledFields.length === 0) return null;
+                      if (fields.length === 0) return null;
                       return (
-                        <div className="space-y-2 mt-2">
-                          {filledFields.map((field) => {
+                        <div className="space-y-3 mt-2">
+                          {fields.map((field) => {
                             const val = templateObj[field.key];
-                            const textVal = Array.isArray(val) ? val.join(", ") : String(val);
+                            const textVal = Array.isArray(val) ? val.join(", ") : String(val || "");
                             const isCopyable = field.type === "textarea" || field.key === "caption";
+                            const isEditing = editingTemplateField === field.key;
+
+                            const startEditing = () => {
+                              setEditingTemplateField(field.key);
+                              setTemplateFieldValues(prev => ({ ...prev, [field.key]: textVal }));
+                            };
+
+                            const saveField = () => {
+                              let latestObj: Record<string, any> = {};
+                              try {
+                                if (card.templateData) latestObj = JSON.parse(card.templateData);
+                              } catch {}
+                              const newVal = templateFieldValues[field.key] ?? textVal;
+                              const updatedObj = { ...latestObj, [field.key]: newVal };
+                              updateCardMutation.mutate({ templateData: JSON.stringify(updatedObj) });
+                              setEditingTemplateField(null);
+                            };
+
+                            const cancelEditing = () => {
+                              setEditingTemplateField(null);
+                            };
+
                             return (
                               <div key={field.key} data-testid={`template-field-${field.key}`}>
                                 <div className="flex items-center justify-between">
                                   <span className="text-xs text-muted-foreground font-medium">{field.label}</span>
-                                  {isCopyable && (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-6 text-[10px] gap-1"
-                                      onClick={async () => {
-                                        try {
-                                          await navigator.clipboard.writeText(textVal);
-                                          setCopiedField(field.key);
-                                          setTimeout(() => setCopiedField(null), 2000);
-                                        } catch {
-                                          toast({ title: "Não foi possível copiar", variant: "destructive" });
-                                        }
-                                      }}
-                                      data-testid={`button-copy-${field.key}`}
-                                    >
-                                      {copiedField === field.key ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
-                                      {copiedField === field.key ? "Copiado!" : "Copiar"}
-                                    </Button>
-                                  )}
+                                  <div className="flex items-center gap-1">
+                                    {isCopyable && textVal && (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-6 text-[10px] gap-1"
+                                        onClick={async () => {
+                                          try {
+                                            await navigator.clipboard.writeText(textVal);
+                                            setCopiedField(field.key);
+                                            setTimeout(() => setCopiedField(null), 2000);
+                                          } catch {
+                                            toast({ title: "Não foi possível copiar", variant: "destructive" });
+                                          }
+                                        }}
+                                        data-testid={`button-copy-${field.key}`}
+                                      >
+                                        {copiedField === field.key ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                                        {copiedField === field.key ? "Copiado!" : "Copiar"}
+                                      </Button>
+                                    )}
+                                    {!isEditing && currentUser?.role && isInternalRole(currentUser.role) && (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-6 text-[10px] gap-1"
+                                        onClick={startEditing}
+                                        data-testid={`button-edit-${field.key}`}
+                                      >
+                                        <Pencil className="w-3 h-3" />
+                                        Editar
+                                      </Button>
+                                    )}
+                                  </div>
                                 </div>
-                                <p className="text-sm mt-0.5 whitespace-pre-wrap">
-                                  {textVal}
-                                </p>
+                                {isEditing ? (
+                                  <div className="mt-1">
+                                    {field.type === "textarea" ? (
+                                      <TextareaWithExtras
+                                        value={templateFieldValues[field.key] || ""}
+                                        onChange={(v) => setTemplateFieldValues(prev => ({ ...prev, [field.key]: v }))}
+                                        placeholder={field.label}
+                                        templates={textTemplates}
+                                        rows={3}
+                                        testId={`edit-template-${field.key}`}
+                                      />
+                                    ) : field.type === "date" ? (
+                                      <Input
+                                        type="date"
+                                        value={templateFieldValues[field.key] || ""}
+                                        onChange={(e) => setTemplateFieldValues(prev => ({ ...prev, [field.key]: e.target.value }))}
+                                        data-testid={`edit-template-${field.key}`}
+                                      />
+                                    ) : (
+                                      <Input
+                                        value={templateFieldValues[field.key] || ""}
+                                        onChange={(e) => setTemplateFieldValues(prev => ({ ...prev, [field.key]: e.target.value }))}
+                                        placeholder={field.label}
+                                        data-testid={`edit-template-${field.key}`}
+                                      />
+                                    )}
+                                    <div className="flex gap-1 mt-1.5">
+                                      <Button size="sm" className="h-7 text-xs" onClick={saveField} data-testid={`button-save-${field.key}`}>
+                                        <Check className="w-3 h-3 mr-1" />
+                                        Salvar
+                                      </Button>
+                                      <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={cancelEditing} data-testid={`button-cancel-${field.key}`}>
+                                        Cancelar
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  textVal ? (
+                                    <p className="text-sm mt-0.5 whitespace-pre-wrap cursor-pointer hover:bg-muted/50 rounded px-1 -mx-1 py-0.5" onClick={() => currentUser?.role && isInternalRole(currentUser.role) && startEditing()}>
+                                      {textVal}
+                                    </p>
+                                  ) : currentUser?.role && isInternalRole(currentUser.role) ? (
+                                    <p className="text-sm mt-0.5 text-muted-foreground/50 italic cursor-pointer hover:bg-muted/50 rounded px-1 -mx-1 py-0.5" onClick={startEditing}>
+                                      Clique para preencher...
+                                    </p>
+                                  ) : null
+                                )}
                               </div>
                             );
                           })}
@@ -803,13 +886,12 @@ export function KanbanCardModal({ cardId, clientId, open, onClose, columnTitle }
                     )}
                     {card.approvalStatus === "Pendente" && (currentUser?.role === "client" || currentUser?.role === "admin") && (
                       <div className="mt-3 space-y-2">
-                        <Textarea
+                        <TextareaWithExtras
                           value={approvalNotes}
-                          onChange={(e) => setApprovalNotes(e.target.value)}
+                          onChange={(val) => setApprovalNotes(val)}
                           placeholder="Observações (opcional)..."
-                          className="text-sm resize-none"
                           rows={2}
-                          data-testid="textarea-approval-notes"
+                          testId="textarea-approval-notes"
                         />
                         <div className="flex gap-2 flex-wrap">
                           <Button
@@ -1065,13 +1147,16 @@ export function KanbanCardModal({ cardId, clientId, open, onClose, columnTitle }
                     ))}
                   </div>
                   <div className="flex gap-2">
-                    <Textarea
-                      value={newComment}
-                      onChange={(e) => setNewComment(e.target.value)}
-                      placeholder="Escrever um comentario..."
-                      className="text-sm min-h-[60px] resize-none"
-                      data-testid="textarea-new-comment"
-                    />
+                    <div className="flex-1">
+                      <TextareaWithExtras
+                        value={newComment}
+                        onChange={(val) => setNewComment(val)}
+                        placeholder="Escrever um comentário..."
+                        templates={textTemplates}
+                        rows={2}
+                        testId="textarea-new-comment"
+                      />
+                    </div>
                   </div>
                   <Button
                     size="sm"

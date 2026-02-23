@@ -62,13 +62,7 @@ export function KanbanCreateCardDialog({
   clientId,
 }: KanbanCreateCardDialogProps) {
   const { data: textTemplates } = useQuery<{ id: number; name: string; content: string }[]>({
-    queryKey: ["/api/onboarding", clientId, "text-templates"],
-    queryFn: async () => {
-      if (!clientId) return [];
-      const res = await fetch(`/api/onboarding/${clientId}/text-templates`, { credentials: "include" });
-      if (!res.ok) return [];
-      return res.json();
-    },
+    queryKey: [`/api/onboarding/${clientId}/text-templates`],
     enabled: !!clientId,
   });
   const [step, setStep] = useState<1 | 2>(1);

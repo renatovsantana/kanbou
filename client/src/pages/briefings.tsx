@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { TextareaWithExtras } from "@/components/rich-text-editor";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -898,12 +899,12 @@ export default function BriefingsPage() {
             </div>
             <div>
               <Label>Descrição (opcional)</Label>
-              <Textarea
+              <TextareaWithExtras
                 value={templateDescription}
-                onChange={e => setTemplateDescription(e.target.value)}
+                onChange={(val) => setTemplateDescription(val)}
                 placeholder="Descreva o objetivo deste template..."
-                className="resize-none min-h-[60px]"
-                data-testid="textarea-template-description"
+                rows={3}
+                testId="textarea-template-description"
               />
             </div>
             <div>

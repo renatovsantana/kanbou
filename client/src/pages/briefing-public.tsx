@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { TextareaWithExtras } from "@/components/rich-text-editor";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
@@ -433,12 +434,13 @@ export default function BriefingPublicPage() {
                         hasError={hasError}
                       />
                     ) : (
-                      <Textarea
+                      <TextareaWithExtras
                         value={answers[q.id] || ""}
-                        onChange={(e) => setAnswer(q.id, e.target.value)}
+                        onChange={(val) => setAnswer(q.id, val)}
                         placeholder="Digite sua resposta..."
-                        className={`resize-none min-h-[80px] ${hasError ? "border-destructive" : ""}`}
-                        data-testid={`input-${q.id}`}
+                        className={hasError ? "border-destructive" : ""}
+                        rows={3}
+                        testId={`input-${q.id}`}
                       />
                     )}
 
@@ -573,12 +575,13 @@ export default function BriefingPublicPage() {
               hasError={hasError}
             />
           ) : (
-            <Textarea
+            <TextareaWithExtras
               value={answers[q.id] || ""}
-              onChange={(e) => setAnswer(q.id, e.target.value)}
+              onChange={(val) => setAnswer(q.id, val)}
               placeholder="Digite sua resposta..."
-              className={`resize-none min-h-[80px] ${hasError ? "border-destructive" : ""}`}
-              data-testid={`input-${q.id}`}
+              className={hasError ? "border-destructive" : ""}
+              rows={3}
+              testId={`input-${q.id}`}
             />
           )}
 
