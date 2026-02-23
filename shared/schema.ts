@@ -276,19 +276,19 @@ export const kanbanTimeEntries = pgTable("kanban_time_entries", {
 
 export const DEFAULT_KANBAN_COLUMNS = [
   "Fila",
+  "Desenvolvendo Copy",
+  "Finalizado Copy",
   "Desenvolvendo Design",
   "Revisar Criação",
-  "Finalizado Copy",
-  "Desenvolvendo Copy",
-  "Em Aprovação",
   "Tráfego e RDS",
+  "Em Aprovação",
   "Revisão",
   "Aprovados",
-  "Reprovados",
   "Agendamento",
   "Agendados",
   "Postados",
   "Finalizados",
+  "Reprovados",
 ];
 
 export const MANDATORY_FIRST_COLUMN = "Fila";
@@ -525,9 +525,9 @@ export const APPROVAL_STATUS_TO_COLUMN: Record<string, string> = {
   "Refeito": "Em Aprovação",
 };
 
-export const PROTECTED_KANBAN_COLUMNS = ["Fila", "Em Aprovação", "Aprovados", "Reprovados", "Revisão", "Agendamento", "Agendados", "Postados", "Finalizados"];
+export const PROTECTED_KANBAN_COLUMNS = [...DEFAULT_KANBAN_COLUMNS];
 
-export const FIXED_KANBAN_COLUMNS = ["Em Aprovação", "Aprovados", "Reprovados", "Revisão", "Agendamento", "Agendados", "Postados", "Finalizados"];
+export const FIXED_KANBAN_COLUMNS = [...DEFAULT_KANBAN_COLUMNS];
 
 export const clientProducts = pgTable("client_products", {
   id: serial("id").primaryKey(),
