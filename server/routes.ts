@@ -2241,9 +2241,11 @@ export async function registerRoutes(
 
     const fromCol = columns.find(c => c.id === card.columnId);
 
+    const columnChanged = card.columnId !== targetCol.id;
     const updated = await storage.updateKanbanCard(card.id, {
       columnId: targetCol.id,
       position: maxPos,
+      ...(columnChanged ? { columnEnteredAt: new Date() } : {}),
     });
 
     await storage.createKanbanActivity({

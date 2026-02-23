@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
-import type { KanbanCard, KanbanComment, KanbanActivity, KanbanTimeEntry } from "@shared/schema";
+import type { KanbanCard, KanbanColumn, KanbanComment, KanbanActivity, KanbanTimeEntry } from "@shared/schema";
 import type { User } from "@shared/schema";
 import { CARD_TYPE_LABELS, CARD_TYPE_COLORS, CARD_TYPE_FIELDS, type CardType, isInternalRole } from "@shared/schema";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -49,6 +49,9 @@ import {
   CheckCircle2,
   XCircle,
   Save,
+  CalendarCheck,
+  Calendar,
+  RotateCcw,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -58,6 +61,7 @@ interface KanbanCardModalProps {
   clientId: number;
   open: boolean;
   onClose: () => void;
+  columnTitle?: string;
 }
 
 interface ChecklistItem {
@@ -103,6 +107,29 @@ function formatDuration(totalSeconds: number): string {
   return `${minutes}m ${seconds}s`;
 }
 
+function useLiveTimer(startDate: Date | string | null | undefined) {
+  const [elapsed, setElapsed] = useState("");
+  useEffect(() => {
+    if (!startDate) return;
+    const start = typeof startDate === "string" ? new Date(startDate) : startDate;
+    const update = () => {
+      const diff = Math.max(0, Math.floor((Date.now() - start.getTime()) / 1000));
+      const d = Math.floor(diff / 86400);
+      const h = Math.floor((diff % 86400) / 3600);
+      const m = Math.floor((diff % 3600) / 60);
+      const s = diff % 60;
+      if (d > 0) setElapsed(`${d}d ${h}h ${m}m`);
+      else if (h > 0) setElapsed(`${h}h ${m}m ${s}s`);
+      else if (m > 0) setElapsed(`${m}m ${s}s`);
+      else setElapsed(`${s}s`);
+    };
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [startDate]);
+  return elapsed;
+}
+
 function getInitials(name: string): string {
   return name
     .split(" ")
@@ -113,7 +140,7 @@ function getInitials(name: string): string {
     .toUpperCase();
 }
 
-export function KanbanCardModal({ cardId, clientId, open, onClose }: KanbanCardModalProps) {
+export function KanbanCardModal({ cardId, clientId, open, onClose, columnTitle }: KanbanCardModalProps) {
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
   const [editingTitle, setEditingTitle] = useState(false);
@@ -129,6 +156,8 @@ export function KanbanCardModal({ cardId, clientId, open, onClose }: KanbanCardM
   const [attachmentToDelete, setAttachmentToDelete] = useState<{ id: string; name: string } | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isCoverUploading, setIsCoverUploading] = useState(false);
+  const [showScheduleConfirm, setShowScheduleConfirm] = useState(false);
+  const [showBackToFilaConfirm, setShowBackToFilaConfirm] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const coverFileInputRef = useRef<HTMLInputElement>(null);
@@ -156,6 +185,63 @@ export function KanbanCardModal({ cardId, clientId, open, onClose }: KanbanCardM
   const { data: users = [] } = useQuery<User[]>({
     queryKey: ["/api/users"],
     enabled: open,
+  });
+
+  const { data: columns = [] } = useQuery<KanbanColumn[]>({
+    queryKey: ["/api/kanban", clientId, "columns"],
+    enabled: !!clientId && open,
+  });
+
+  const resolvedColumnTitle = columnTitle || (() => {
+    if (!card) return "";
+    const col = columns.find(c => c.id === card.columnId);
+    return col?.title || "";
+  })();
+
+  const isInAgendamento = resolvedColumnTitle === "Agendamento";
+  const isInPostadosOrFinalizados = resolvedColumnTitle === "Postados" || resolvedColumnTitle === "Finalizados";
+  const liveTime = useLiveTimer(card?.columnEnteredAt || card?.createdAt);
+
+  const backToFilaMutation = useMutation({
+    mutationFn: async () => {
+      const filaCol = columns.find(c => c.title === "Fila");
+      if (!filaCol) throw new Error("Coluna 'Fila' não encontrada");
+      await apiRequest("PUT", `/api/kanban/cards/${cardId}/move`, {
+        toColumnId: filaCol.id,
+        newPosition: 0,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/kanban/cards", cardId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/kanban", clientId, "cards"] });
+      setShowBackToFilaConfirm(false);
+      toast({ title: "Cartão movido de volta para 'Fila'" });
+      onClose();
+    },
+    onError: (err: any) => {
+      toast({ title: err?.message || "Erro ao mover cartão", variant: "destructive" });
+    },
+  });
+
+  const scheduleCardMutation = useMutation({
+    mutationFn: async () => {
+      const agendadosCol = columns.find(c => c.title === "Agendados");
+      if (!agendadosCol) throw new Error("Coluna 'Agendados' não encontrada");
+      await apiRequest("PUT", `/api/kanban/cards/${cardId}/move`, {
+        toColumnId: agendadosCol.id,
+        newPosition: 0,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/kanban/cards", cardId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/kanban", clientId, "cards"] });
+      setShowScheduleConfirm(false);
+      toast({ title: "Post movido para 'Agendados' com sucesso" });
+      onClose();
+    },
+    onError: (err: any) => {
+      toast({ title: err?.message || "Erro ao agendar", variant: "destructive" });
+    },
   });
 
   useEffect(() => {
@@ -535,6 +621,13 @@ export function KanbanCardModal({ cardId, clientId, open, onClose }: KanbanCardM
               </div>
             </DialogHeader>
 
+            {liveTime && resolvedColumnTitle && (
+              <div className="flex items-center gap-2 mb-3 text-xs text-muted-foreground" data-testid="text-column-timer">
+                <Clock className="w-3.5 h-3.5 text-primary" />
+                <span>Na coluna <strong>{resolvedColumnTitle}</strong> há <span className="font-mono font-semibold text-foreground">{liveTime}</span></span>
+              </div>
+            )}
+
             {card?.approvalPostId && (
               <div className="flex items-center gap-1.5 mb-3 text-xs text-muted-foreground" data-testid="text-approval-link">
                 <Link2 className="w-3.5 h-3.5 text-primary" />
@@ -626,6 +719,20 @@ export function KanbanCardModal({ cardId, clientId, open, onClose }: KanbanCardM
                         </div>
                       );
                     })()}
+                  </div>
+                )}
+
+                {isInAgendamento && card && (
+                  <div className="rounded-md border border-primary/30 bg-primary/5 p-4" data-testid="section-schedule-post">
+                    <Button
+                      className="w-full"
+                      size="lg"
+                      onClick={() => setShowScheduleConfirm(true)}
+                      data-testid="button-schedule-post-modal"
+                    >
+                      <CalendarCheck className="w-5 h-5 mr-2" />
+                      Agendar Post
+                    </Button>
                   </div>
                 )}
 
@@ -1222,6 +1329,18 @@ export function KanbanCardModal({ cardId, clientId, open, onClose }: KanbanCardM
                   </Button>
                 )}
 
+                {isInPostadosOrFinalizados && isInternalRole(currentUser?.role || "") && (
+                  <Button
+                    variant="secondary"
+                    className="w-full justify-start"
+                    onClick={() => setShowBackToFilaConfirm(true)}
+                    data-testid="button-back-to-fila"
+                  >
+                    <RotateCcw className="w-4 h-4 mr-2" />
+                    Voltar p/ Fila
+                  </Button>
+                )}
+
                 {card?.dueDate && (
                   <div className="pt-2 border-t">
                     <p className="text-xs text-muted-foreground">Entrega</p>
@@ -1299,6 +1418,133 @@ export function KanbanCardModal({ cardId, clientId, open, onClose }: KanbanCardM
               data-testid="button-confirm-delete-attachment"
             >
               Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={showScheduleConfirm} onOpenChange={setShowScheduleConfirm}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CalendarCheck className="w-5 h-5 text-primary" />
+              Confirmar Agendamento
+            </DialogTitle>
+          </DialogHeader>
+          {card && (() => {
+            let tplData: Record<string, any> = {};
+            try { tplData = card.templateData ? JSON.parse(card.templateData) : {}; } catch {}
+            const caption = tplData.caption || "";
+            const publishDate = tplData.publishDate || "";
+            const platforms: string[] = (() => {
+              try {
+                if (tplData.platform) {
+                  const p = typeof tplData.platform === "string" ? JSON.parse(tplData.platform) : tplData.platform;
+                  return Array.isArray(p) ? p : [];
+                }
+              } catch {}
+              return [];
+            })();
+            const formattedDate = publishDate ? (() => {
+              try {
+                const parts = publishDate.split("T")[0].split("-");
+                return `${parts[2]}/${parts[1]}/${parts[0]}`;
+              } catch { return publishDate; }
+            })() : null;
+
+            return (
+              <div className="space-y-4" data-testid="schedule-confirm-modal-details">
+                <div className="text-sm font-semibold text-foreground">{card.title}</div>
+
+                {card.coverUrl && (
+                  <div className="rounded-lg overflow-hidden border bg-muted">
+                    <img
+                      src={card.coverUrl}
+                      alt={card.title}
+                      className="w-full max-h-52 object-contain"
+                      data-testid="schedule-confirm-modal-image"
+                    />
+                  </div>
+                )}
+
+                {caption && (
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Legenda</label>
+                    <div className="text-sm bg-muted/50 rounded-md p-3 whitespace-pre-wrap max-h-32 overflow-y-auto" data-testid="schedule-confirm-modal-caption">
+                      {caption}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex gap-4 flex-wrap">
+                  {formattedDate && (
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Data da Postagem</label>
+                      <div className="flex items-center gap-1.5 text-sm font-medium" data-testid="schedule-confirm-modal-date">
+                        <Calendar className="w-4 h-4 text-primary" />
+                        {formattedDate}
+                      </div>
+                    </div>
+                  )}
+                  {platforms.length > 0 && (
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Plataformas</label>
+                      <div className="flex gap-1 flex-wrap" data-testid="schedule-confirm-modal-platforms">
+                        {platforms.map((p) => (
+                          <Badge key={p} variant="secondary" className="text-xs">{p}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md p-3 text-sm text-amber-800 dark:text-amber-200" data-testid="schedule-confirm-modal-warning">
+                  Tem certeza que este post foi agendado corretamente?
+                </div>
+
+                <div className="flex justify-end gap-2 pt-1">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowScheduleConfirm(false)}
+                    data-testid="button-cancel-schedule-modal"
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    onClick={() => scheduleCardMutation.mutate()}
+                    disabled={scheduleCardMutation.isPending}
+                    data-testid="button-confirm-schedule-modal"
+                  >
+                    {scheduleCardMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                    ) : (
+                      <CalendarCheck className="w-4 h-4 mr-1.5" />
+                    )}
+                    Sim, já agendei
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={showBackToFilaConfirm} onOpenChange={setShowBackToFilaConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertTitle>Voltar para Fila</AlertTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja mover o cartão "{card?.title}" de volta para a coluna "Fila"?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-back-to-fila">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => backToFilaMutation.mutate()}
+              disabled={backToFilaMutation.isPending}
+              data-testid="button-confirm-back-to-fila"
+            >
+              {backToFilaMutation.isPending ? "Movendo..." : "Confirmar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

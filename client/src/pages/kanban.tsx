@@ -104,6 +104,29 @@ const LABEL_COLORS: Record<string, string> = {
   azul: "bg-blue-500",
 };
 
+function useLiveTimer(startDate: Date | string | null | undefined) {
+  const [elapsed, setElapsed] = useState("");
+  useEffect(() => {
+    if (!startDate) return;
+    const start = typeof startDate === "string" ? new Date(startDate) : startDate;
+    const update = () => {
+      const diff = Math.max(0, Math.floor((Date.now() - start.getTime()) / 1000));
+      const d = Math.floor(diff / 86400);
+      const h = Math.floor((diff % 86400) / 3600);
+      const m = Math.floor((diff % 3600) / 60);
+      const s = diff % 60;
+      if (d > 0) setElapsed(`${d}d ${h}h ${m}m`);
+      else if (h > 0) setElapsed(`${h}h ${m}m ${s}s`);
+      else if (m > 0) setElapsed(`${m}m ${s}s`);
+      else setElapsed(`${s}s`);
+    };
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [startDate]);
+  return elapsed;
+}
+
 const CARD_TYPE_ACCENT: Record<string, string> = {
   post: "#3b82f6",
   material_offline: "#f59e0b",
@@ -151,6 +174,7 @@ function SortableCard({
   }
 
   const accentColor = CARD_TYPE_ACCENT[card.cardType as string] || CARD_TYPE_ACCENT.geral;
+  const liveTime = useLiveTimer(card.columnEnteredAt || card.createdAt);
 
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
@@ -234,6 +258,12 @@ function SortableCard({
 
           <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-border/50">
             <div className="flex items-center gap-2.5 flex-wrap">
+              {liveTime && (
+                <span className="flex items-center gap-1 text-[11px] text-muted-foreground font-mono" data-testid={`text-card-timer-${card.id}`}>
+                  <Clock className="w-3 h-3" />
+                  {liveTime}
+                </span>
+              )}
               {card.dueDate && (
                 <span className="flex items-center gap-1 text-[11px] text-muted-foreground" data-testid={`text-card-due-${card.id}`}>
                   <Calendar className="w-3 h-3" />
@@ -1351,25 +1381,106 @@ export default function KanbanBoard() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={!!scheduleConfirmCard} onOpenChange={(open) => { if (!open) setScheduleConfirmCard(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar agendamento</AlertDialogTitle>
-            <AlertDialogDescription>
-              Você realmente já agendou a postagem de "{scheduleConfirmCard?.title}"? Ao confirmar, o cartão será movido para a coluna "Agendados".
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-schedule">Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmSchedule}
-              data-testid="button-confirm-schedule"
-            >
-              Sim, já agendei
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <Dialog open={!!scheduleConfirmCard} onOpenChange={(open) => { if (!open) setScheduleConfirmCard(null); }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CalendarCheck className="w-5 h-5 text-primary" />
+              Confirmar Agendamento
+            </DialogTitle>
+          </DialogHeader>
+          {scheduleConfirmCard && (() => {
+            let tplData: Record<string, any> = {};
+            try { tplData = scheduleConfirmCard.templateData ? JSON.parse(scheduleConfirmCard.templateData) : {}; } catch {}
+            const caption = tplData.caption || "";
+            const publishDate = tplData.publishDate || "";
+            const platforms: string[] = (() => {
+              try {
+                if (tplData.platform) {
+                  const p = typeof tplData.platform === "string" ? JSON.parse(tplData.platform) : tplData.platform;
+                  return Array.isArray(p) ? p : [];
+                }
+              } catch {}
+              return [];
+            })();
+            const formattedDate = publishDate ? (() => {
+              try {
+                const parts = publishDate.split("T")[0].split("-");
+                return `${parts[2]}/${parts[1]}/${parts[0]}`;
+              } catch { return publishDate; }
+            })() : null;
+
+            return (
+              <div className="space-y-4" data-testid="schedule-confirm-details">
+                <div className="text-sm font-semibold text-foreground">{scheduleConfirmCard.title}</div>
+
+                {scheduleConfirmCard.coverUrl && (
+                  <div className="rounded-lg overflow-hidden border bg-muted">
+                    <img
+                      src={scheduleConfirmCard.coverUrl}
+                      alt={scheduleConfirmCard.title}
+                      className="w-full max-h-52 object-contain"
+                      data-testid="schedule-confirm-image"
+                    />
+                  </div>
+                )}
+
+                {caption && (
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Legenda</label>
+                    <div className="text-sm bg-muted/50 rounded-md p-3 whitespace-pre-wrap max-h-32 overflow-y-auto" data-testid="schedule-confirm-caption">
+                      {caption}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex gap-4 flex-wrap">
+                  {formattedDate && (
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Data da Postagem</label>
+                      <div className="flex items-center gap-1.5 text-sm font-medium" data-testid="schedule-confirm-date">
+                        <Calendar className="w-4 h-4 text-primary" />
+                        {formattedDate}
+                      </div>
+                    </div>
+                  )}
+                  {platforms.length > 0 && (
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Plataformas</label>
+                      <div className="flex gap-1 flex-wrap" data-testid="schedule-confirm-platforms">
+                        {platforms.map((p) => (
+                          <Badge key={p} variant="secondary" className="text-xs">{p}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md p-3 text-sm text-amber-800 dark:text-amber-200" data-testid="schedule-confirm-warning">
+                  Tem certeza que este post foi agendado corretamente?
+                </div>
+
+                <div className="flex justify-end gap-2 pt-1">
+                  <Button
+                    variant="outline"
+                    onClick={() => setScheduleConfirmCard(null)}
+                    data-testid="button-cancel-schedule"
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    onClick={handleConfirmSchedule}
+                    data-testid="button-confirm-schedule"
+                  >
+                    <CalendarCheck className="w-4 h-4 mr-1.5" />
+                    Sim, já agendei
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
 
       {clientId && (
         <KanbanCardModal
@@ -1377,6 +1488,13 @@ export default function KanbanBoard() {
           clientId={clientId}
           open={selectedCardId !== null}
           onClose={() => setSelectedCardId(null)}
+          columnTitle={(() => {
+            if (!selectedCardId) return undefined;
+            const selectedCard = cards.find(c => c.id === selectedCardId);
+            if (!selectedCard) return undefined;
+            const col = columns.find(c => c.id === selectedCard.columnId);
+            return col?.title;
+          })()}
         />
       )}
     </div>

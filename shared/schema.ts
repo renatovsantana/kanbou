@@ -239,6 +239,7 @@ export const kanbanCards = pgTable("kanban_cards", {
   approvalPostId: integer("approval_post_id").references(() => approvalPosts.id),
   approvalSentAt: timestamp("approval_sent_at"),
   approvalResolvedAt: timestamp("approval_resolved_at"),
+  columnEnteredAt: timestamp("column_entered_at").defaultNow(),
   createdBy: integer("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
 });

@@ -68,14 +68,21 @@ interface MovementReport {
 }
 
 function formatHours(hours: number): string {
-  if (hours < 1) {
-    const minutes = Math.round(hours * 60);
-    return `${minutes}m`;
+  const totalSeconds = Math.round(hours * 3600);
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  if (h > 0) {
+    if (m > 0 && s > 0) return `${h}h ${m}m ${s}s`;
+    if (m > 0) return `${h}h ${m}m`;
+    if (s > 0) return `${h}h 0m ${s}s`;
+    return `${h}h`;
   }
-  const h = Math.floor(hours);
-  const m = Math.round((hours - h) * 60);
-  if (m > 0) return `${h}h ${m}m`;
-  return `${h}h`;
+  if (m > 0) {
+    if (s > 0) return `${m}m ${s}s`;
+    return `${m}m`;
+  }
+  return `${s}s`;
 }
 
 const CARD_TYPE_LABELS: Record<string, string> = {

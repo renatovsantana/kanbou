@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
-import { CalendarDays, Filter, ListFilter, AlertTriangle, Clock, Kanban, RefreshCw } from "lucide-react";
+import { CalendarDays, Filter, ListFilter, Clock, Kanban, RefreshCw } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import type { Client } from "@shared/schema";
 
@@ -112,17 +112,6 @@ export default function CalendarView() {
         if (!item.scheduledDate) return false;
         const itemDate = new Date(item.scheduledDate);
         return !isBefore(itemDate, today);
-      })
-      .sort((a, b) => new Date(a.scheduledDate).getTime() - new Date(b.scheduledDate).getTime());
-  }, [filteredItems]);
-
-  const overdueItems = useMemo(() => {
-    const today = startOfDay(new Date());
-    return filteredItems
-      .filter(item => {
-        if (!item.scheduledDate) return false;
-        const itemDate = new Date(item.scheduledDate);
-        return isBefore(itemDate, today) && item.status !== "Publicado" && item.status !== "published" && item.status !== "Postado";
       })
       .sort((a, b) => new Date(a.scheduledDate).getTime() - new Date(b.scheduledDate).getTime());
   }, [filteredItems]);
@@ -289,13 +278,6 @@ export default function CalendarView() {
               <Badge variant="secondary" className="ml-1.5 text-[10px] no-default-hover-elevate no-default-active-elevate">{scheduledItems.length}</Badge>
             )}
           </TabsTrigger>
-          {overdueItems.length > 0 && (
-            <TabsTrigger value="overdue" data-testid="tab-overdue">
-              <AlertTriangle className="w-4 h-4 mr-1.5 text-destructive" />
-              Atrasados
-              <Badge variant="destructive" className="ml-1.5 text-[10px] no-default-hover-elevate no-default-active-elevate">{overdueItems.length}</Badge>
-            </TabsTrigger>
-          )}
         </TabsList>
 
         <TabsContent value="calendar">
@@ -387,26 +369,6 @@ export default function CalendarView() {
           </Card>
         </TabsContent>
 
-        {overdueItems.length > 0 && (
-          <TabsContent value="overdue">
-            <Card>
-              <CardHeader className="border-b border-destructive/20 bg-destructive/5 flex flex-row items-center justify-between gap-2">
-                <CardTitle className="text-base font-semibold flex items-center gap-2 text-destructive">
-                  <AlertTriangle className="w-4 h-4" />
-                  Agendamentos Atrasados
-                </CardTitle>
-                <Badge variant="destructive" className="text-xs no-default-hover-elevate no-default-active-elevate">
-                  {overdueItems.length} item{overdueItems.length !== 1 ? "s" : ""}
-                </Badge>
-              </CardHeader>
-              <CardContent className="p-5">
-                <div className="space-y-3">
-                  {overdueItems.map(renderItemCard)}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        )}
       </Tabs>
     </div>
   );

@@ -577,7 +577,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async moveKanbanCard(cardId: number, toColumnId: number, newPosition: number): Promise<KanbanCard> {
-    const [c] = await db.update(kanbanCards).set({ columnId: toColumnId, position: newPosition }).where(eq(kanbanCards.id, cardId)).returning();
+    const [existing] = await db.select().from(kanbanCards).where(eq(kanbanCards.id, cardId));
+    const columnChanged = existing && existing.columnId !== toColumnId;
+    const [c] = await db.update(kanbanCards).set({
+      columnId: toColumnId,
+      position: newPosition,
+      ...(columnChanged ? { columnEnteredAt: new Date() } : {}),
+    }).where(eq(kanbanCards.id, cardId)).returning();
     return c;
   }
 
@@ -674,7 +680,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getClientProducts(clientId: number): Promise<ClientProduct[]> {
-    return await db.select().from(clientProducts).where(eq(clientProducts.clientId, clientId)).orderBy(asc(clientProducts.id));
+    return await db.select().from(clientProducts).where(eq(clientProducts.clientId, clientId)).orderBy(desc(clientProducts.id));
   }
   async createClientProduct(product: InsertClientProduct): Promise<ClientProduct> {
     const [p] = await db.insert(clientProducts).values(product).returning();
@@ -689,7 +695,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getClientServices(clientId: number): Promise<ClientService[]> {
-    return await db.select().from(clientServices).where(eq(clientServices.clientId, clientId)).orderBy(asc(clientServices.id));
+    return await db.select().from(clientServices).where(eq(clientServices.clientId, clientId)).orderBy(desc(clientServices.id));
   }
   async createClientService(service: InsertClientService): Promise<ClientService> {
     const [s] = await db.insert(clientServices).values(service).returning();
@@ -704,7 +710,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getClientCredentials(clientId: number): Promise<ClientCredential[]> {
-    return await db.select().from(clientCredentials).where(eq(clientCredentials.clientId, clientId)).orderBy(asc(clientCredentials.id));
+    return await db.select().from(clientCredentials).where(eq(clientCredentials.clientId, clientId)).orderBy(desc(clientCredentials.id));
   }
   async createClientCredential(cred: InsertClientCredential): Promise<ClientCredential> {
     const [c] = await db.insert(clientCredentials).values(cred).returning();
