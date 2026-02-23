@@ -1490,7 +1490,21 @@ export default function Approvals() {
       }
       groups[key].posts.push(post);
     }
-    return Object.values(groups).sort((a, b) => b.sortKey.localeCompare(a.sortKey));
+    const statusPriority: Record<string, number> = {
+      "Pendente": 0,
+      "Revisão": 1,
+      "Revisado": 2,
+      "Aprovado": 3,
+    };
+    const periods = Object.values(groups).sort((a, b) => b.sortKey.localeCompare(a.sortKey));
+    for (const period of periods) {
+      period.posts.sort((a, b) => {
+        const pa = statusPriority[a.status] ?? 99;
+        const pb = statusPriority[b.status] ?? 99;
+        return pa - pb;
+      });
+    }
+    return periods;
   }, [clientPosts]);
 
   const clientOverviewData = useMemo(() => {
