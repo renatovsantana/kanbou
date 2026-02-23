@@ -1984,34 +1984,35 @@ export async function registerRoutes(
       }
       columns = await storage.getKanbanColumnsByClient(clientId);
     } else {
-      const existingTitles = columns.map(c => c.title);
-      let added = false;
+      const existingTitles = new Set(columns.map(c => c.title));
+      const missingCols: string[] = [];
       for (const requiredCol of DEFAULT_KANBAN_COLUMNS) {
-        if (!existingTitles.includes(requiredCol)) {
-          const defaultIdx = DEFAULT_KANBAN_COLUMNS.indexOf(requiredCol);
-          let insertPos = defaultIdx;
-          const prevDefault = DEFAULT_KANBAN_COLUMNS.slice(0, defaultIdx).reverse().find(t => existingTitles.includes(t));
-          if (prevDefault) {
-            const prevCol = columns.find(c => c.title === prevDefault);
-            if (prevCol) insertPos = prevCol.position + 1;
-          }
-          const colsToShift = columns.filter(c => c.position >= insertPos);
-          for (const col of colsToShift) {
-            await storage.updateKanbanColumn(col.id, { position: col.position + 1 });
-            col.position += 1;
-          }
-          const newCol = await storage.createKanbanColumn({
-            clientId,
-            title: requiredCol,
-            position: insertPos,
-            isDefault: true,
-          });
-          columns.push(newCol);
-          existingTitles.push(requiredCol);
-          added = true;
+        if (!existingTitles.has(requiredCol)) {
+          missingCols.push(requiredCol);
         }
       }
-      if (added) {
+      if (missingCols.length > 0) {
+        for (const title of missingCols) {
+          await storage.createKanbanColumn({ clientId, title, position: 999, isDefault: true });
+        }
+        columns = await storage.getKanbanColumnsByClient(clientId);
+        const defaultCols: typeof columns = [];
+        const customCols: typeof columns = [];
+        for (const col of columns) {
+          if (DEFAULT_KANBAN_COLUMNS.includes(col.title)) {
+            defaultCols.push(col);
+          } else {
+            customCols.push(col);
+          }
+        }
+        defaultCols.sort((a, b) => DEFAULT_KANBAN_COLUMNS.indexOf(a.title) - DEFAULT_KANBAN_COLUMNS.indexOf(b.title));
+        customCols.sort((a, b) => a.position - b.position);
+        const sorted = [...defaultCols, ...customCols];
+        for (let i = 0; i < sorted.length; i++) {
+          if (sorted[i].position !== i) {
+            await storage.updateKanbanColumn(sorted[i].id, { position: i });
+          }
+        }
         columns = await storage.getKanbanColumnsByClient(clientId);
       }
     }
