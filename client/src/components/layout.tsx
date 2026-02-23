@@ -348,7 +348,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   ];
 
   const kanbanNav = [
-    { name: "Quadro", href: "/kanban", icon: Kanban },
+    { name: "Kanbou", href: "/kanban", icon: Kanban },
   ];
 
   const managementNav = [
@@ -404,7 +404,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               onClick={() => setIsMobileMenuOpen(false)}
             >
               <Kanban className="w-[18px] h-[18px] sidebar-link-icon" />
-              Quadro
+              Kanbou
               <button
                 className="ml-auto"
                 onClick={(e) => {

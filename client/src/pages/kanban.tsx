@@ -754,7 +754,7 @@ function KanbanBgSettings({ client }: { client: Client }) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
-      toast({ title: "Fundo do quadro atualizado" });
+      toast({ title: "Fundo do Kanbou atualizado" });
     },
     onError: () => {
       toast({ title: "Erro ao salvar fundo", variant: "destructive" });
@@ -782,7 +782,7 @@ function KanbanBgSettings({ client }: { client: Client }) {
       </PopoverTrigger>
       <PopoverContent className="w-80" align="end">
         <div className="space-y-3">
-          <h3 className="text-sm font-semibold">Fundo do Quadro</h3>
+          <h3 className="text-sm font-semibold">Fundo do Kanbou</h3>
 
           <div>
             <Label className="text-xs text-muted-foreground mb-1.5 block">Cor de fundo</Label>
@@ -1271,7 +1271,7 @@ export default function KanbanBoard() {
               <Kanban className="w-8 h-8 text-white/40" />
             </div>
             <p className="text-white/60 text-sm font-medium" data-testid="text-no-client">
-              Selecione um cliente para visualizar o quadro.
+              Selecione um cliente para visualizar o Kanbou.
             </p>
           </div>
         </div>
