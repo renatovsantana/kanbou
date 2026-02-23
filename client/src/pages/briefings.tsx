@@ -157,7 +157,7 @@ function generatePdfContent(briefing: Briefing, answers: Record<string, any>): s
   return html;
 }
 
-export function exportBriefingPdf(briefing: Briefing) {
+export async function exportBriefingPdf(briefing: Briefing, templates?: BriefingTemplate[]) {
   if (!briefing.answers) return;
   let answers: Record<string, any>;
   try {
@@ -165,7 +165,19 @@ export function exportBriefingPdf(briefing: Briefing) {
   } catch {
     return;
   }
-  const html = generatePdfContent(briefing, answers);
+
+  let html: string;
+  if (briefing.briefingType === "custom" && briefing.templateId) {
+    const template = templates?.find(t => t.id === briefing.templateId);
+    let questions: BriefingTemplateQuestion[] = [];
+    if (template) {
+      try { questions = JSON.parse(template.questions); } catch {}
+    }
+    html = generateCustomPdfContent(briefing, answers, questions);
+  } else {
+    html = generatePdfContent(briefing, answers);
+  }
+
   const printWindow = window.open("", "_blank");
   if (!printWindow) return;
   printWindow.document.write(html);
@@ -173,6 +185,65 @@ export function exportBriefingPdf(briefing: Briefing) {
   setTimeout(() => {
     printWindow.print();
   }, 500);
+}
+
+function generateCustomPdfContent(briefing: Briefing, answers: Record<string, any>, questions: BriefingTemplateQuestion[]): string {
+  let html = `
+    <html><head><meta charset="utf-8">
+    <style>
+      body { font-family: 'Segoe UI', Arial, sans-serif; padding: 40px; color: #1a1a1a; max-width: 800px; margin: 0 auto; }
+      h1 { color: #16a34a; font-size: 28px; border-bottom: 3px solid #16a34a; padding-bottom: 12px; margin-bottom: 8px; }
+      .subtitle { color: #666; font-size: 14px; margin-bottom: 32px; }
+      .question { margin: 16px 0; padding: 12px 0; border-bottom: 1px solid #e5e7eb; }
+      .question-label { font-size: 12px; color: #6b7280; font-weight: 600; margin-bottom: 6px; text-transform: uppercase; }
+      .answer { font-size: 14px; line-height: 1.6; }
+      .color-swatch { display: inline-block; width: 28px; height: 28px; border-radius: 6px; border: 2px solid #e5e7eb; margin-right: 8px; vertical-align: middle; }
+      @media print { body { padding: 20px; } }
+    </style>
+    </head><body>
+    <h1>${briefing.title}</h1>
+    <div class="subtitle">Cliente: ${briefing.clientName} &mdash; Respondido em ${briefing.completedAt ? new Date(briefing.completedAt).toLocaleDateString("pt-BR") : new Date().toLocaleDateString("pt-BR")}</div>
+  `;
+
+  for (const q of questions) {
+    const answer = answers[q.id];
+    if (!answer || (Array.isArray(answer) && answer.length === 0)) continue;
+
+    html += `<div class="question"><div class="question-label">${q.text}</div><div class="answer">`;
+
+    if (q.type === "color-picker" && Array.isArray(answer)) {
+      for (const c of answer) {
+        if (c) html += `<span class="color-swatch" style="background:${c}"></span><span style="font-size:12px;margin-right:16px;">${c}</span>`;
+      }
+    } else if (typeof answer === "object" && answer !== null && answer.fileUrl) {
+      html += `<a href="${window.location.origin}${answer.fileUrl}" target="_blank">${answer.fileName || "Arquivo anexado"}</a>`;
+    } else {
+      html += String(answer);
+    }
+
+    html += `</div></div>`;
+  }
+
+  if (questions.length === 0) {
+    const entries = Object.entries(answers);
+    for (const [key, answer] of entries) {
+      if (!answer || (Array.isArray(answer) && answer.length === 0)) continue;
+      html += `<div class="question"><div class="question-label">Pergunta</div><div class="answer">`;
+      if (Array.isArray(answer)) {
+        for (const c of answer) {
+          if (c) html += `<span class="color-swatch" style="background:${c}"></span><span style="font-size:12px;margin-right:16px;">${c}</span>`;
+        }
+      } else if (typeof answer === "object" && answer !== null && answer.fileUrl) {
+        html += `<a href="${window.location.origin}${answer.fileUrl}" target="_blank">${answer.fileName || "Arquivo anexado"}</a>`;
+      } else {
+        html += String(answer);
+      }
+      html += `</div></div>`;
+    }
+  }
+
+  html += `</body></html>`;
+  return html;
 }
 
 export default function BriefingsPage() {
@@ -357,6 +428,64 @@ export default function BriefingsPage() {
       return <p className="text-sm text-muted-foreground">Respostas inválidas</p>;
     }
 
+    if (briefing.briefingType === "custom" && briefing.templateId) {
+      const template = templatesList.find(t => t.id === briefing.templateId);
+      let questions: BriefingTemplateQuestion[] = [];
+      if (template) {
+        try { questions = JSON.parse(template.questions); } catch {}
+      }
+
+      if (questions.length === 0) {
+        const entries = Object.entries(answers);
+        return (
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+            {entries.map(([key, answer]) => {
+              if (!answer || (Array.isArray(answer) && answer.length === 0)) return null;
+              return (
+                <div key={key} className="border-b pb-3">
+                  <p className="text-xs font-medium text-muted-foreground mb-1">Resposta</p>
+                  {renderAnswerValue(answer)}
+                </div>
+              );
+            })}
+          </div>
+        );
+      }
+
+      return (
+        <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+          {questions.map((q, idx) => {
+            const answer = answers[q.id];
+            if (!answer || (Array.isArray(answer) && answer.length === 0)) return null;
+            return (
+              <div key={q.id} className="border-b pb-3">
+                <p className="text-xs font-medium text-muted-foreground mb-1">
+                  {String(idx + 1).padStart(2, '0')}. {q.text}
+                </p>
+                {q.type === "color-picker" && Array.isArray(answer) ? (
+                  <div className="flex items-center gap-3 mt-1">
+                    {answer.map((c: string, i: number) => c ? (
+                      <div key={i} className="flex items-center gap-1.5">
+                        <div className="w-6 h-6 rounded-md border" style={{ backgroundColor: c }} />
+                        <span className="text-xs text-muted-foreground">{c}</span>
+                      </div>
+                    ) : null)}
+                  </div>
+                ) : typeof answer === "object" && answer !== null && answer.fileUrl ? (
+                  <a href={answer.fileUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary underline flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5" />
+                    {answer.fileName || "Arquivo anexado"}
+                  </a>
+                ) : (
+                  <p className="text-sm">{String(answer)}</p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+
     return (
       <div className="space-y-8 max-h-[60vh] overflow-y-auto pr-2">
         {BRIEFING_QUESTIONS.map((phase) => (
@@ -377,37 +506,7 @@ export default function BriefingsPage() {
                     <p className="text-xs font-medium text-muted-foreground mb-1">
                       {q.text}
                     </p>
-                    {q.type === "color-picker" && Array.isArray(answer) ? (
-                      <div className="flex items-center gap-3 mt-1">
-                        {answer.map((c: string, i: number) => c ? (
-                          <div key={i} className="flex items-center gap-1.5">
-                            <div className="w-6 h-6 rounded-md border" style={{ backgroundColor: c }} />
-                            <span className="text-xs text-muted-foreground">{c}</span>
-                          </div>
-                        ) : null)}
-                      </div>
-                    ) : q.type === "image-upload" && Array.isArray(answer) ? (
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        {answer.map((url: string, i: number) => (
-                          <img key={i} src={url} className="w-24 h-24 object-cover rounded-md border" />
-                        ))}
-                      </div>
-                    ) : Array.isArray(answer) ? (
-                      <div className="flex flex-wrap gap-1.5 mt-1">
-                        {answer.map((a: string) => (
-                          <Badge key={a} variant="secondary" className="text-xs">
-                            {a}
-                          </Badge>
-                        ))}
-                      </div>
-                    ) : typeof answer === "object" && answer !== null && answer.fileUrl ? (
-                      <a href={answer.fileUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary underline flex items-center gap-1.5">
-                        <FileText className="w-3.5 h-3.5" />
-                        {answer.fileName || "Arquivo anexado"}
-                      </a>
-                    ) : (
-                      <p className="text-sm">{String(answer)}</p>
-                    )}
+                    {renderAnswerValue(answer, q)}
                   </div>
                 );
               })}
@@ -416,6 +515,62 @@ export default function BriefingsPage() {
         ))}
       </div>
     );
+  };
+
+  const renderAnswerValue = (answer: any, q?: BriefingQuestion) => {
+    if (q?.type === "color-picker" && Array.isArray(answer)) {
+      return (
+        <div className="flex items-center gap-3 mt-1">
+          {answer.map((c: string, i: number) => c ? (
+            <div key={i} className="flex items-center gap-1.5">
+              <div className="w-6 h-6 rounded-md border" style={{ backgroundColor: c }} />
+              <span className="text-xs text-muted-foreground">{c}</span>
+            </div>
+          ) : null)}
+        </div>
+      );
+    }
+    if (q?.type === "image-upload" && Array.isArray(answer)) {
+      return (
+        <div className="flex flex-wrap gap-2 mt-1">
+          {answer.map((url: string, i: number) => (
+            <img key={i} src={url} className="w-24 h-24 object-cover rounded-md border" />
+          ))}
+        </div>
+      );
+    }
+    if (Array.isArray(answer)) {
+      if (answer.every((c: any) => typeof c === "string" && c.startsWith("#"))) {
+        return (
+          <div className="flex items-center gap-3 mt-1">
+            {answer.map((c: string, i: number) => c ? (
+              <div key={i} className="flex items-center gap-1.5">
+                <div className="w-6 h-6 rounded-md border" style={{ backgroundColor: c }} />
+                <span className="text-xs text-muted-foreground">{c}</span>
+              </div>
+            ) : null)}
+          </div>
+        );
+      }
+      return (
+        <div className="flex flex-wrap gap-1.5 mt-1">
+          {answer.map((a: string, i: number) => (
+            <Badge key={i} variant="secondary" className="text-xs">
+              {a}
+            </Badge>
+          ))}
+        </div>
+      );
+    }
+    if (typeof answer === "object" && answer !== null && answer.fileUrl) {
+      return (
+        <a href={answer.fileUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary underline flex items-center gap-1.5">
+          <FileText className="w-3.5 h-3.5" />
+          {answer.fileName || "Arquivo anexado"}
+        </a>
+      );
+    }
+    return <p className="text-sm">{String(answer)}</p>;
   };
 
   const renderBriefingsList = () => {
@@ -503,7 +658,7 @@ export default function BriefingsPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => exportBriefingPdf(briefing)}
+                      onClick={() => exportBriefingPdf(briefing, templatesList)}
                       data-testid={`button-export-pdf-${briefing.id}`}
                     >
                       <Download className="w-3.5 h-3.5 mr-1.5" />
@@ -829,7 +984,7 @@ export default function BriefingsPage() {
           </DialogHeader>
           <div className="flex justify-end">
             {viewBriefing && (
-              <Button variant="outline" size="sm" onClick={() => exportBriefingPdf(viewBriefing)} data-testid="button-export-pdf-dialog">
+              <Button variant="outline" size="sm" onClick={() => exportBriefingPdf(viewBriefing, templatesList)} data-testid="button-export-pdf-dialog">
                 <Download className="w-3.5 h-3.5 mr-1.5" />
                 Exportar PDF
               </Button>
