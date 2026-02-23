@@ -207,6 +207,8 @@ export function KanbanCardModal({ cardId, clientId, open, onClose, columnTitle }
 
   const isInAgendamento = resolvedColumnTitle === "Agendamento";
   const isInPostadosOrFinalizados = resolvedColumnTitle === "Postados" || resolvedColumnTitle === "Finalizados";
+  const isInAgendados = resolvedColumnTitle === "Agendados";
+  const canBackToFila = isInPostadosOrFinalizados || isInAgendados;
 
   const { data: columnTimesData } = useQuery<Record<number, { accumulatedSeconds: number; openSince: string | null }>>({
     queryKey: ["/api/kanban/client", clientId, "column-times"],
@@ -218,16 +220,12 @@ export function KanbanCardModal({ cardId, clientId, open, onClose, columnTitle }
 
   const backToFilaMutation = useMutation({
     mutationFn: async () => {
-      const filaCol = columns.find(c => c.title === "Fila");
-      if (!filaCol) throw new Error("Coluna 'Fila' não encontrada");
-      await apiRequest("PUT", `/api/kanban/cards/${cardId}/move`, {
-        toColumnId: filaCol.id,
-        newPosition: 0,
-      });
+      await apiRequest("PUT", `/api/kanban/cards/${cardId}/back-to-fila`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/kanban/cards", cardId] });
       queryClient.invalidateQueries({ queryKey: ["/api/kanban", clientId, "cards"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/kanban/client", clientId, "column-times"] });
       setShowBackToFilaConfirm(false);
       toast({ title: "Cartão movido de volta para 'Fila'" });
       onClose();
@@ -1367,7 +1365,7 @@ export function KanbanCardModal({ cardId, clientId, open, onClose, columnTitle }
                   </Button>
                 )}
 
-                {isInPostadosOrFinalizados && isInternalRole(currentUser?.role || "") && (
+                {canBackToFila && isInternalRole(currentUser?.role || "") && (
                   <Button
                     variant="secondary"
                     className="w-full justify-start"

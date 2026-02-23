@@ -2223,6 +2223,45 @@ export async function registerRoutes(
     res.json(card);
   });
 
+  app.put("/api/kanban/cards/:id/back-to-fila", requireAuth, requireRole(...INTERNAL_ROLES), async (req, res) => {
+    try {
+      const cardId = Number(req.params.id);
+      const user = await getCurrentUser(req);
+      const card = await storage.getKanbanCard(cardId);
+      if (!card) return res.status(404).json({ message: "Cartão não encontrado" });
+
+      const columns = await storage.getKanbanColumnsByClient(card.clientId);
+      const filaCol = columns.find(c => c.title === MANDATORY_FIRST_COLUMN);
+      if (!filaCol) return res.status(404).json({ message: "Coluna 'Fila' não encontrada" });
+
+      const fromCol = columns.find(c => c.id === card.columnId);
+      const oldColumnId = card.columnId;
+
+      const updated = await storage.moveKanbanCard(cardId, filaCol.id, 0);
+
+      await storage.createKanbanActivity({
+        cardId: updated.id,
+        userId: user?.id ?? null,
+        action: "moved",
+        fromColumnId: oldColumnId,
+        toColumnId: filaCol.id,
+        details: `Retornado de "${fromCol?.title}" para "Fila"`,
+      });
+
+      const openEntry = await storage.getOpenTimeEntry(cardId);
+      if (openEntry) await storage.stopTimeEntry(openEntry.id);
+
+      if (user) {
+        await storage.startTimeEntry(cardId, user.id, filaCol.id);
+      }
+
+      res.json(updated);
+    } catch (err) {
+      console.error("Error moving card back to fila:", err);
+      res.status(500).json({ message: "Erro ao mover cartão" });
+    }
+  });
+
   async function moveCardToColumn(card: any, targetColumnTitle: string, userId?: number | null): Promise<any> {
     const columns = await storage.getKanbanColumnsByClient(card.clientId);
     let targetCol = columns.find(c => c.title === targetColumnTitle);
