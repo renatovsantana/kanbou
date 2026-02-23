@@ -414,6 +414,15 @@ export async function getDriveFileDownloadUrl(fileId: string): Promise<string> {
   return res.data.webContentLink || `https://drive.google.com/uc?export=download&id=${fileId}`;
 }
 
+export async function getDriveFileStream(fileId: string): Promise<{ stream: any; mimeType: string; name: string }> {
+  const drive = await getDriveClient();
+  const meta = await drive.files.get({ fileId, fields: 'mimeType, name' });
+  const mimeType = meta.data.mimeType || 'application/octet-stream';
+  const name = meta.data.name || 'file';
+  const res = await drive.files.get({ fileId, alt: 'media' }, { responseType: 'stream' });
+  return { stream: res.data, mimeType, name };
+}
+
 async function findAllApprovalsFolders(drive: any, clientFolderId: string): Promise<string[]> {
   const approvalIds: string[] = [];
 

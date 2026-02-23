@@ -7,7 +7,7 @@ import { loginSchema, registerSchema, DEFAULT_KANBAN_COLUMNS, CONDITIONAL_COLUMN
 import { z } from "zod";
 import { hashPassword, verifyPassword, requireAuth, requireRole, getCurrentUser } from "./auth";
 import { registerLocalStorageRoutes } from "./local-storage";
-import { createClientFolder, createApprovalSubfolder, uploadImageFromUrl, listDriveFiles, getDriveFileDownloadUrl, listApprovalVersionFolders, isDriveConnected, getDriveUserInfo, uploadKanbanFileToDrive, listKanbanExtensionFolders, deleteDriveFile, resetOAuth2Client } from "./google-drive";
+import { createClientFolder, createApprovalSubfolder, uploadImageFromUrl, listDriveFiles, getDriveFileDownloadUrl, getDriveFileStream, listApprovalVersionFolders, isDriveConnected, getDriveUserInfo, uploadKanbanFileToDrive, listKanbanExtensionFolders, deleteDriveFile, resetOAuth2Client } from "./google-drive";
 import multer from "multer";
 import sharp from "sharp";
 import * as fs from "fs";
@@ -3232,6 +3232,37 @@ export async function registerRoutes(
     res.set("Content-Type", "image/webp");
     res.set("Cache-Control", "public, max-age=31536000, immutable");
     res.sendFile(filePath);
+  });
+
+  app.get("/api/drive-proxy/:fileId", requireAuth, async (req, res) => {
+    try {
+      const { fileId } = req.params;
+      if (!fileId) return res.status(400).json({ message: "File ID obrigatório" });
+
+      const user = await getCurrentUser(req);
+      if (!user) return res.status(401).json({ message: "Não autenticado" });
+
+      if (user.role === "client" && user.clientId) {
+        const clientCards = await storage.getKanbanCardsByClient(user.clientId);
+        const hasAccess = clientCards.some(card => {
+          if (!card.attachments) return false;
+          try {
+            const atts = JSON.parse(card.attachments as string);
+            return Array.isArray(atts) && atts.some((a: any) => a.driveFileId === fileId);
+          } catch { return false; }
+        });
+        if (!hasAccess) return res.status(404).json({ message: "Arquivo não encontrado" });
+      }
+
+      const { stream, mimeType, name } = await getDriveFileStream(fileId);
+      res.set("Content-Type", mimeType);
+      res.set("Cache-Control", "private, max-age=3600");
+      res.set("Content-Disposition", `inline; filename="${encodeURIComponent(name)}"`);
+      stream.pipe(res);
+    } catch (err: any) {
+      console.error("Drive proxy error:", err?.message);
+      res.status(500).json({ message: "Erro ao carregar arquivo do Drive" });
+    }
   });
 
   app.post("/api/kanban/cards/:id/cover-upload", requireAuth, upload.single("file"), async (req, res) => {

@@ -55,6 +55,10 @@ import {
   Copy,
   Check,
   Pencil,
+  ZoomIn,
+  ChevronLeft,
+  ChevronRight,
+  ExternalLink,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -852,6 +856,49 @@ export function KanbanCardModal({ cardId, clientId, open, onClose, columnTitle }
                       <CalendarCheck className="w-5 h-5 mr-2" />
                       Agendar Post
                     </Button>
+                  </div>
+                )}
+
+                {card?.approvalStatus && imageAttachments.length > 0 && (
+                  <div className="rounded-md border p-3" data-testid="section-approval-preview">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Image className="w-4 h-4 text-muted-foreground" />
+                      <h3 className="text-sm font-semibold">Prévia dos materiais</h3>
+                      <span className="text-xs text-muted-foreground">({imageAttachments.length} {imageAttachments.length === 1 ? "imagem" : "imagens"})</span>
+                    </div>
+                    <div className="space-y-3">
+                      {imageAttachments.map((att) => {
+                        const proxyUrl = att.driveFileId ? `/api/drive-proxy/${att.driveFileId}` : att.thumbnailUrl || att.url;
+                        const driveViewUrl = att.driveUrl || att.url;
+                        const dlUrl = att.driveDownloadUrl || att.url;
+                        return (
+                          <div key={att.id} className="rounded-lg overflow-hidden border bg-muted/30" data-testid={`preview-image-${att.id}`}>
+                            <div className="w-full flex items-center justify-center bg-black/5 min-h-[200px] max-h-[500px]">
+                              <img
+                                src={proxyUrl}
+                                alt={att.name}
+                                className="max-w-full max-h-[500px] object-contain"
+                                loading="lazy"
+                              />
+                            </div>
+                            <div className="flex items-center gap-2 px-3 py-2 bg-background/80">
+                              <span className="text-xs text-muted-foreground flex-1 truncate">{att.name}</span>
+                              <span className="text-[10px] text-muted-foreground shrink-0">{formatFileSize(att.size)}</span>
+                              <a href={driveViewUrl} target="_blank" rel="noopener noreferrer" title="Ver no Drive" data-testid={`button-drive-view-${att.id}`}>
+                                <Button variant="ghost" size="icon" className="h-7 w-7">
+                                  <ExternalLink className="w-3.5 h-3.5" />
+                                </Button>
+                              </a>
+                              <a href={dlUrl} target="_blank" rel="noopener noreferrer" title="Baixar em alta resolução" data-testid={`button-drive-download-${att.id}`}>
+                                <Button variant="ghost" size="icon" className="h-7 w-7">
+                                  <Download className="w-3.5 h-3.5" />
+                                </Button>
+                              </a>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
 
