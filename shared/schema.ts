@@ -267,6 +267,7 @@ export const kanbanTimeEntries = pgTable("kanban_time_entries", {
   id: serial("id").primaryKey(),
   cardId: integer("card_id").references(() => kanbanCards.id).notNull(),
   userId: integer("user_id").references(() => users.id).notNull(),
+  columnId: integer("column_id").references(() => kanbanColumns.id),
   startedAt: timestamp("started_at").notNull().defaultNow(),
   endedAt: timestamp("ended_at"),
   totalSeconds: integer("total_seconds"),
@@ -294,6 +295,11 @@ export const TIMED_COLUMNS = [
   "Fila",
   "Desenvolvendo Design",
   "Desenvolvendo Copy",
+];
+
+export const TIMER_EXCLUDED_COLUMNS = [
+  "Postados",
+  "Finalizados",
 ];
 
 export const insertKanbanColumnSchema = createInsertSchema(kanbanColumns).omit({

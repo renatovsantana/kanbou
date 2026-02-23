@@ -67,6 +67,35 @@ interface MovementReport {
   columnTimeReport: ColumnTimeEntry[];
 }
 
+interface CardTimeReport {
+  cardId: number;
+  cardTitle: string;
+  cardType: string;
+  clientId: number;
+  clientName: string;
+  currentColumn: string;
+  totalSeconds: number;
+  columnTimes: Record<string, { totalSeconds: number; entries: number; openSince: string | null }>;
+}
+
+function formatSeconds(totalSec: number): string {
+  const d = Math.floor(totalSec / 86400);
+  const h = Math.floor((totalSec % 86400) / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  if (d > 0) return `${d}d ${h}h ${m}m`;
+  if (h > 0) {
+    if (m > 0 && s > 0) return `${h}h ${m}m ${s}s`;
+    if (m > 0) return `${h}h ${m}m`;
+    return `${h}h`;
+  }
+  if (m > 0) {
+    if (s > 0) return `${m}m ${s}s`;
+    return `${m}m`;
+  }
+  return `${s}s`;
+}
+
 function formatHours(hours: number): string {
   const totalSeconds = Math.round(hours * 3600);
   const h = Math.floor(totalSeconds / 3600);
@@ -125,6 +154,9 @@ export default function ReportsPage() {
   const [actClientFilter, setActClientFilter] = useState<string>(isClient && user?.clientId ? String(user.clientId) : "all");
   const [actMonth, setActMonth] = useState<string>(String(now.getMonth() + 1));
   const [actYear, setActYear] = useState<string>(String(now.getFullYear()));
+
+  const [ctClientFilter, setCtClientFilter] = useState<string>("all");
+  const [expandedCardTimes, setExpandedCardTimes] = useState<Set<number>>(new Set());
 
   const { data: clientsData = [] } = useQuery<Client[]>({ queryKey: ["/api/clients"] });
   const { data: usersData = [] } = useQuery<User[]>({ queryKey: ["/api/users"] });
@@ -211,11 +243,31 @@ export default function ReportsPage() {
     refetchInterval: 5000,
   });
 
+  const cardTimesQueryKey = useMemo(() => {
+    const params: Record<string, string> = {};
+    if (ctClientFilter !== "all") params.clientId = ctClientFilter;
+    const qs = new URLSearchParams(params).toString();
+    return `/api/reports/card-times${qs ? `?${qs}` : ""}`;
+  }, [ctClientFilter]);
+
+  const { data: cardTimesData = [], isLoading: cardTimesLoading } = useQuery<CardTimeReport[]>({
+    queryKey: [cardTimesQueryKey],
+    refetchInterval: 10000,
+    enabled: activeTab === "card-times",
+  });
+
   const toggleUser = (userId: number) => {
     const next = new Set(expandedUsers);
     if (next.has(userId)) next.delete(userId);
     else next.add(userId);
     setExpandedUsers(next);
+  };
+
+  const toggleCardTime = (cardId: number) => {
+    const next = new Set(expandedCardTimes);
+    if (next.has(cardId)) next.delete(cardId);
+    else next.add(cardId);
+    setExpandedCardTimes(next);
   };
 
   const toggleCard = (key: string) => {
@@ -278,6 +330,7 @@ export default function ReportsPage() {
                   queryClient.invalidateQueries({ queryKey: [workflowQueryKey] });
                   queryClient.invalidateQueries({ queryKey: [movementQueryKey] });
                   queryClient.invalidateQueries({ queryKey: [activityQueryKey] });
+                  queryClient.invalidateQueries({ queryKey: [cardTimesQueryKey] });
                 }}
                 title="Atualizar"
                 data-testid="button-refresh-reports"
@@ -309,6 +362,12 @@ export default function ReportsPage() {
                     Atividade por Usuário
                   </TabsTrigger>
                 </>
+              )}
+              {!isClient && (
+                <TabsTrigger value="card-times" data-testid="tab-card-times">
+                  <Clock className="w-4 h-4 mr-2" />
+                  Tempo por Cartão
+                </TabsTrigger>
               )}
               <TabsTrigger value="client-activity" data-testid="tab-client-activity">
                 <Building2 className="w-4 h-4 mr-2" />
@@ -792,6 +851,181 @@ export default function ReportsPage() {
                   )}
                 </>
               ) : null}
+            </TabsContent>
+
+            <TabsContent value="card-times" className="space-y-6 mt-4">
+              <Card data-testid="card-ct-filters">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium flex items-center gap-2">
+                    <Filter className="w-4 h-4" />
+                    Filtros
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-muted-foreground mb-1 block">Cliente</label>
+                      <Select value={ctClientFilter} onValueChange={setCtClientFilter}>
+                        <SelectTrigger data-testid="select-ct-client-filter">
+                          <SelectValue placeholder="Todos os clientes" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos os clientes</SelectItem>
+                          {clientsData.map((c) => (
+                            <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {cardTimesLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <p className="text-muted-foreground">Carregando relatório...</p>
+                </div>
+              ) : cardTimesData.length === 0 ? (
+                <Card>
+                  <CardContent className="py-12 text-center text-muted-foreground">
+                    <Clock className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                    <p>Nenhum dado de tempo encontrado</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Card data-testid="card-ct-total-cards">
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+                        <CardTitle className="text-sm font-medium">Cards com Tempo</CardTitle>
+                        <BarChart3 className="w-4 h-4 text-muted-foreground" />
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold" data-testid="text-ct-total">{cardTimesData.filter(c => c.totalSeconds > 0 || Object.values(c.columnTimes).some(ct => ct.openSince)).length}</div>
+                      </CardContent>
+                    </Card>
+                    <Card data-testid="card-ct-total-time">
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+                        <CardTitle className="text-sm font-medium">Tempo Total</CardTitle>
+                        <Clock className="w-4 h-4 text-muted-foreground" />
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold" data-testid="text-ct-total-time">
+                          {formatSeconds(cardTimesData.reduce((sum, c) => sum + c.totalSeconds, 0))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card data-testid="card-ct-avg-time">
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+                        <CardTitle className="text-sm font-medium">Tempo Médio por Card</CardTitle>
+                        <Clock className="w-4 h-4 text-muted-foreground" />
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold" data-testid="text-ct-avg-time">
+                          {(() => {
+                            const cardsWithTime = cardTimesData.filter(c => c.totalSeconds > 0);
+                            if (cardsWithTime.length === 0) return "0s";
+                            return formatSeconds(Math.round(cardsWithTime.reduce((s, c) => s + c.totalSeconds, 0) / cardsWithTime.length));
+                          })()}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <div className="space-y-2">
+                    {cardTimesData.map((cardReport) => {
+                      const isExpanded = expandedCardTimes.has(cardReport.cardId);
+                      const hasTime = cardReport.totalSeconds > 0 || Object.values(cardReport.columnTimes).some(ct => ct.openSince);
+                      if (!hasTime) return null;
+
+                      const accentColor: Record<string, string> = {
+                        post: "#3b82f6",
+                        material_offline: "#f59e0b",
+                        material_digital: "#a855f7",
+                        copy: "#10b981",
+                        roteiro: "#ef4444",
+                        identidade_visual: "#ec4899",
+                        geral: "#6b7280",
+                      };
+                      const color = accentColor[cardReport.cardType] || accentColor.geral;
+
+                      return (
+                        <Card key={cardReport.cardId} data-testid={`card-time-report-${cardReport.cardId}`}>
+                          <div
+                            className="flex items-center gap-3 p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+                            onClick={() => toggleCardTime(cardReport.cardId)}
+                            data-testid={`button-toggle-card-time-${cardReport.cardId}`}
+                          >
+                            <div
+                              className="w-1 h-10 rounded-full shrink-0"
+                              style={{ background: color }}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="font-medium text-sm truncate" data-testid={`text-ct-card-title-${cardReport.cardId}`}>
+                                  {cardReport.cardTitle}
+                                </p>
+                                <Badge variant="outline" className="text-[10px] shrink-0" style={{ borderColor: color, color }}>
+                                  {CARD_TYPE_LABELS[cardReport.cardType] || cardReport.cardType}
+                                </Badge>
+                              </div>
+                              <div className="flex items-center gap-3 mt-1">
+                                <span className="text-xs text-muted-foreground">{cardReport.clientName}</span>
+                                <span className="text-xs text-muted-foreground">•</span>
+                                <span className="text-xs text-muted-foreground">Coluna atual: <span className="font-medium text-foreground">{cardReport.currentColumn}</span></span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3 shrink-0">
+                              <div className="text-right">
+                                <p className="font-mono font-bold text-sm" data-testid={`text-ct-card-total-${cardReport.cardId}`}>
+                                  {formatSeconds(cardReport.totalSeconds)}
+                                </p>
+                                <p className="text-[10px] text-muted-foreground">tempo total</p>
+                              </div>
+                              {isExpanded ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+                            </div>
+                          </div>
+
+                          {isExpanded && (
+                            <div className="px-4 pb-4 border-t">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-3">
+                                {Object.entries(cardReport.columnTimes)
+                                  .sort(([, a], [, b]) => b.totalSeconds - a.totalSeconds)
+                                  .map(([colName, data]) => {
+                                    const isActive = !!data.openSince;
+                                    return (
+                                      <div
+                                        key={colName}
+                                        className={`rounded-lg border p-3 ${isActive ? "border-primary/50 bg-primary/5" : "bg-muted/30"}`}
+                                        data-testid={`card-ct-column-${cardReport.cardId}-${colName.replace(/\s/g, "-").toLowerCase()}`}
+                                      >
+                                        <div className="flex items-center justify-between gap-2">
+                                          <p className="text-sm font-medium truncate">{colName}</p>
+                                          {isActive && (
+                                            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-primary">
+                                              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                                              Ativo
+                                            </span>
+                                          )}
+                                        </div>
+                                        <p className="text-xl font-bold font-mono mt-1">
+                                          {formatSeconds(data.totalSeconds)}
+                                        </p>
+                                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                                          {data.entries} {data.entries === 1 ? "passagem" : "passagens"}
+                                        </p>
+                                      </div>
+                                    );
+                                  })}
+                              </div>
+                            </div>
+                          )}
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
             </TabsContent>
 
             <TabsContent value="client-activity" className="space-y-6 mt-4">

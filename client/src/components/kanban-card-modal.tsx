@@ -52,6 +52,8 @@ import {
   CalendarCheck,
   Calendar,
   RotateCcw,
+  Copy,
+  Check,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -107,26 +109,30 @@ function formatDuration(totalSeconds: number): string {
   return `${minutes}m ${seconds}s`;
 }
 
-function useLiveTimer(startDate: Date | string | null | undefined) {
+function useAccumulatedTimer(accumulatedSeconds: number, openSince: string | null) {
   const [elapsed, setElapsed] = useState("");
   useEffect(() => {
-    if (!startDate) return;
-    const start = typeof startDate === "string" ? new Date(startDate) : startDate;
     const update = () => {
-      const diff = Math.max(0, Math.floor((Date.now() - start.getTime()) / 1000));
-      const d = Math.floor(diff / 86400);
-      const h = Math.floor((diff % 86400) / 3600);
-      const m = Math.floor((diff % 3600) / 60);
-      const s = diff % 60;
+      let total = accumulatedSeconds;
+      if (openSince) {
+        const start = new Date(openSince);
+        total += Math.max(0, Math.floor((Date.now() - start.getTime()) / 1000));
+      }
+      const d = Math.floor(total / 86400);
+      const h = Math.floor((total % 86400) / 3600);
+      const m = Math.floor((total % 3600) / 60);
+      const s = total % 60;
       if (d > 0) setElapsed(`${d}d ${h}h ${m}m`);
       else if (h > 0) setElapsed(`${h}h ${m}m ${s}s`);
       else if (m > 0) setElapsed(`${m}m ${s}s`);
       else setElapsed(`${s}s`);
     };
     update();
-    const interval = setInterval(update, 1000);
-    return () => clearInterval(interval);
-  }, [startDate]);
+    if (openSince) {
+      const interval = setInterval(update, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [accumulatedSeconds, openSince]);
   return elapsed;
 }
 
@@ -158,6 +164,7 @@ export function KanbanCardModal({ cardId, clientId, open, onClose, columnTitle }
   const [isCoverUploading, setIsCoverUploading] = useState(false);
   const [showScheduleConfirm, setShowScheduleConfirm] = useState(false);
   const [showBackToFilaConfirm, setShowBackToFilaConfirm] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const coverFileInputRef = useRef<HTMLInputElement>(null);
@@ -200,7 +207,14 @@ export function KanbanCardModal({ cardId, clientId, open, onClose, columnTitle }
 
   const isInAgendamento = resolvedColumnTitle === "Agendamento";
   const isInPostadosOrFinalizados = resolvedColumnTitle === "Postados" || resolvedColumnTitle === "Finalizados";
-  const liveTime = useLiveTimer(card?.columnEnteredAt || card?.createdAt);
+
+  const { data: columnTimesData } = useQuery<Record<number, { accumulatedSeconds: number; openSince: string | null }>>({
+    queryKey: ["/api/kanban/client", clientId, "column-times"],
+    enabled: !!clientId && !!cardId && open,
+  });
+  const cardTimeData = cardId && columnTimesData ? columnTimesData[cardId] : null;
+  const liveTime = useAccumulatedTimer(cardTimeData?.accumulatedSeconds ?? 0, cardTimeData?.openSince ?? null);
+  const showTimer = !!cardTimeData && (cardTimeData.accumulatedSeconds > 0 || cardTimeData.openSince);
 
   const backToFilaMutation = useMutation({
     mutationFn: async () => {
@@ -621,7 +635,7 @@ export function KanbanCardModal({ cardId, clientId, open, onClose, columnTitle }
               </div>
             </DialogHeader>
 
-            {liveTime && resolvedColumnTitle && (
+            {showTimer && resolvedColumnTitle && (
               <div className="flex items-center gap-2 mb-3 text-xs text-muted-foreground" data-testid="text-column-timer">
                 <Clock className="w-3.5 h-3.5 text-primary" />
                 <span>Na coluna <strong>{resolvedColumnTitle}</strong> há <span className="font-mono font-semibold text-foreground">{liveTime}</span></span>
@@ -707,11 +721,35 @@ export function KanbanCardModal({ cardId, clientId, open, onClose, columnTitle }
                         <div className="space-y-2 mt-2">
                           {filledFields.map((field) => {
                             const val = templateObj[field.key];
+                            const textVal = Array.isArray(val) ? val.join(", ") : String(val);
+                            const isCopyable = field.type === "textarea" || field.key === "caption";
                             return (
                               <div key={field.key} data-testid={`template-field-${field.key}`}>
-                                <span className="text-xs text-muted-foreground font-medium">{field.label}</span>
-                                <p className="text-sm mt-0.5">
-                                  {Array.isArray(val) ? val.join(", ") : String(val)}
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs text-muted-foreground font-medium">{field.label}</span>
+                                  {isCopyable && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 text-[10px] gap-1"
+                                      onClick={async () => {
+                                        try {
+                                          await navigator.clipboard.writeText(textVal);
+                                          setCopiedField(field.key);
+                                          setTimeout(() => setCopiedField(null), 2000);
+                                        } catch {
+                                          toast({ title: "Não foi possível copiar", variant: "destructive" });
+                                        }
+                                      }}
+                                      data-testid={`button-copy-${field.key}`}
+                                    >
+                                      {copiedField === field.key ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                                      {copiedField === field.key ? "Copiado!" : "Copiar"}
+                                    </Button>
+                                  )}
+                                </div>
+                                <p className="text-sm mt-0.5 whitespace-pre-wrap">
+                                  {textVal}
                                 </p>
                               </div>
                             );

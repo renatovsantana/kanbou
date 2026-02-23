@@ -155,8 +155,9 @@ export interface IStorage {
   getMovementReportData(filters?: { clientId?: number; userId?: number; startDate?: Date; endDate?: Date }): Promise<any>;
 
   getKanbanTimeEntries(cardId: number): Promise<KanbanTimeEntry[]>;
+  getKanbanTimeEntriesByCardIds(cardIds: number[]): Promise<KanbanTimeEntry[]>;
   getOpenTimeEntry(cardId: number): Promise<KanbanTimeEntry | undefined>;
-  startTimeEntry(cardId: number, userId: number): Promise<KanbanTimeEntry>;
+  startTimeEntry(cardId: number, userId: number, columnId?: number): Promise<KanbanTimeEntry>;
   stopTimeEntry(entryId: number): Promise<KanbanTimeEntry>;
   getTimeEntriesByUser(userId: number, startDate?: Date, endDate?: Date): Promise<KanbanTimeEntry[]>;
 
@@ -632,13 +633,18 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(kanbanTimeEntries).where(eq(kanbanTimeEntries.cardId, cardId)).orderBy(desc(kanbanTimeEntries.startedAt));
   }
 
+  async getKanbanTimeEntriesByCardIds(cardIds: number[]): Promise<KanbanTimeEntry[]> {
+    if (cardIds.length === 0) return [];
+    return await db.select().from(kanbanTimeEntries).where(inArray(kanbanTimeEntries.cardId, cardIds)).orderBy(desc(kanbanTimeEntries.startedAt));
+  }
+
   async getOpenTimeEntry(cardId: number): Promise<KanbanTimeEntry | undefined> {
     const [entry] = await db.select().from(kanbanTimeEntries).where(and(eq(kanbanTimeEntries.cardId, cardId), isNull(kanbanTimeEntries.endedAt)));
     return entry;
   }
 
-  async startTimeEntry(cardId: number, userId: number): Promise<KanbanTimeEntry> {
-    const [entry] = await db.insert(kanbanTimeEntries).values({ cardId, userId, startedAt: new Date() }).returning();
+  async startTimeEntry(cardId: number, userId: number, columnId?: number): Promise<KanbanTimeEntry> {
+    const [entry] = await db.insert(kanbanTimeEntries).values({ cardId, userId, columnId: columnId ?? null, startedAt: new Date() }).returning();
     return entry;
   }
 

@@ -104,26 +104,34 @@ const LABEL_COLORS: Record<string, string> = {
   azul: "bg-blue-500",
 };
 
-function useLiveTimer(startDate: Date | string | null | undefined) {
+function formatElapsed(totalSec: number): string {
+  const d = Math.floor(totalSec / 86400);
+  const h = Math.floor((totalSec % 86400) / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  if (d > 0) return `${d}d ${h}h ${m}m`;
+  if (h > 0) return `${h}h ${m}m ${s}s`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+
+function useAccumulatedTimer(accumulatedSeconds: number, openSince: string | null) {
   const [elapsed, setElapsed] = useState("");
   useEffect(() => {
-    if (!startDate) return;
-    const start = typeof startDate === "string" ? new Date(startDate) : startDate;
     const update = () => {
-      const diff = Math.max(0, Math.floor((Date.now() - start.getTime()) / 1000));
-      const d = Math.floor(diff / 86400);
-      const h = Math.floor((diff % 86400) / 3600);
-      const m = Math.floor((diff % 3600) / 60);
-      const s = diff % 60;
-      if (d > 0) setElapsed(`${d}d ${h}h ${m}m`);
-      else if (h > 0) setElapsed(`${h}h ${m}m ${s}s`);
-      else if (m > 0) setElapsed(`${m}m ${s}s`);
-      else setElapsed(`${s}s`);
+      let total = accumulatedSeconds;
+      if (openSince) {
+        const start = new Date(openSince);
+        total += Math.max(0, Math.floor((Date.now() - start.getTime()) / 1000));
+      }
+      setElapsed(formatElapsed(total));
     };
     update();
-    const interval = setInterval(update, 1000);
-    return () => clearInterval(interval);
-  }, [startDate]);
+    if (openSince) {
+      const interval = setInterval(update, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [accumulatedSeconds, openSince]);
   return elapsed;
 }
 
@@ -142,11 +150,13 @@ function SortableCard({
   onCardClick,
   columnTitle,
   onScheduleCard,
+  columnTimeData,
 }: {
   card: KanbanCard;
   onCardClick: (card: KanbanCard) => void;
   columnTitle?: string;
   onScheduleCard?: (card: KanbanCard) => void;
+  columnTimeData?: { accumulatedSeconds: number; openSince: string | null };
 }) {
   const {
     attributes,
@@ -174,7 +184,11 @@ function SortableCard({
   }
 
   const accentColor = CARD_TYPE_ACCENT[card.cardType as string] || CARD_TYPE_ACCENT.geral;
-  const liveTime = useLiveTimer(card.columnEnteredAt || card.createdAt);
+  const liveTime = useAccumulatedTimer(
+    columnTimeData?.accumulatedSeconds ?? 0,
+    columnTimeData?.openSince ?? null
+  );
+  const showTimer = !!columnTimeData && (columnTimeData.accumulatedSeconds > 0 || columnTimeData.openSince);
 
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
@@ -258,7 +272,7 @@ function SortableCard({
 
           <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-border/50">
             <div className="flex items-center gap-2.5 flex-wrap">
-              {liveTime && (
+              {showTimer && (
                 <span className="flex items-center gap-1 text-[11px] text-muted-foreground font-mono" data-testid={`text-card-timer-${card.id}`}>
                   <Clock className="w-3 h-3" />
                   {liveTime}
@@ -373,6 +387,7 @@ function DroppableColumn({
   onRenameColumn,
   onDeleteColumn,
   onScheduleCard,
+  columnTimesData,
 }: {
   column: KanbanColumn;
   cards: KanbanCard[];
@@ -381,6 +396,7 @@ function DroppableColumn({
   onRenameColumn: (columnId: number, title: string) => void;
   onDeleteColumn: (column: KanbanColumn) => void;
   onScheduleCard?: (card: KanbanCard) => void;
+  columnTimesData?: Record<number, { accumulatedSeconds: number; openSince: string | null }>;
 }) {
   const { setNodeRef } = useDroppable({ id: `column-${column.id}` });
   const [isEditing, setIsEditing] = useState(false);
@@ -490,7 +506,7 @@ function DroppableColumn({
         >
           <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
             {normalCards.map((card) => (
-              <SortableCard key={card.id} card={card} onCardClick={onCardClick} columnTitle={column.title} onScheduleCard={onScheduleCard} />
+              <SortableCard key={card.id} card={card} onCardClick={onCardClick} columnTitle={column.title} onScheduleCard={onScheduleCard} columnTimeData={columnTimesData?.[card.id]} />
             ))}
             {overdueCards.length > 0 && (
               <>
@@ -503,7 +519,7 @@ function DroppableColumn({
                   <div className="h-px flex-1 bg-destructive/30" />
                 </div>
                 {overdueCards.map((card) => (
-                  <SortableCard key={card.id} card={card} onCardClick={onCardClick} columnTitle={column.title} onScheduleCard={onScheduleCard} />
+                  <SortableCard key={card.id} card={card} onCardClick={onCardClick} columnTitle={column.title} onScheduleCard={onScheduleCard} columnTimeData={columnTimesData?.[card.id]} />
                 ))}
               </>
             )}
@@ -944,6 +960,12 @@ export default function KanbanBoard() {
     refetchInterval: 15000,
   });
 
+  const { data: columnTimesData } = useQuery<Record<number, { accumulatedSeconds: number; openSince: string | null }>>({
+    queryKey: ["/api/kanban/client", clientId, "column-times"],
+    enabled: !!clientId,
+    refetchInterval: 60000,
+  });
+
   const sortedColumns = useMemo(
     () => [...columns].sort((a, b) => a.position - b.position),
     [columns]
@@ -996,6 +1018,7 @@ export default function KanbanBoard() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/kanban", clientId, "cards"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/kanban/client", clientId, "column-times"] });
     },
     onError: (error: any, _vars, context) => {
       if (context?.previousCards) {
@@ -1273,6 +1296,7 @@ export default function KanbanBoard() {
                   onRenameColumn={handleRenameColumn}
                   onDeleteColumn={handleDeleteColumn}
                   onScheduleCard={setScheduleConfirmCard}
+                  columnTimesData={columnTimesData}
                 />
               ))}
 

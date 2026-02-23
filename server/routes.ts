@@ -3,7 +3,7 @@ import type { Server } from "http";
 import { randomUUID } from "crypto";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
-import { loginSchema, registerSchema, DEFAULT_KANBAN_COLUMNS, TIMED_COLUMNS, MANDATORY_FIRST_COLUMN, APPROVAL_STATUS_TO_COLUMN, PROTECTED_KANBAN_COLUMNS, insertClientProductSchema, insertClientServiceSchema, insertClientCredentialSchema, insertClientInsightSchema, isInternalRole, INTERNAL_ROLES } from "@shared/schema";
+import { loginSchema, registerSchema, DEFAULT_KANBAN_COLUMNS, TIMED_COLUMNS, TIMER_EXCLUDED_COLUMNS, MANDATORY_FIRST_COLUMN, APPROVAL_STATUS_TO_COLUMN, PROTECTED_KANBAN_COLUMNS, insertClientProductSchema, insertClientServiceSchema, insertClientCredentialSchema, insertClientInsightSchema, isInternalRole, INTERNAL_ROLES } from "@shared/schema";
 import { z } from "zod";
 import { hashPassword, verifyPassword, requireAuth, requireRole, getCurrentUser } from "./auth";
 import { registerLocalStorageRoutes } from "./local-storage";
@@ -498,12 +498,12 @@ export async function registerRoutes(
           details: `Movido automaticamente: status "${status}" → coluna "${targetColumnTitle}"`,
         });
 
-        if (oldColumn && TIMED_COLUMNS.includes(oldColumn.title)) {
+        if (oldColumn && !TIMER_EXCLUDED_COLUMNS.includes(oldColumn.title)) {
           const openEntry = await storage.getOpenTimeEntry(existingCard.id);
           if (openEntry) await storage.stopTimeEntry(openEntry.id);
         }
-        if (TIMED_COLUMNS.includes(targetColumnTitle) && userId) {
-          await storage.startTimeEntry(existingCard.id, userId);
+        if (!TIMER_EXCLUDED_COLUMNS.includes(targetColumnTitle) && userId) {
+          await storage.startTimeEntry(existingCard.id, userId, targetColumn.id);
         }
       }
     } else {
@@ -979,7 +979,7 @@ export async function registerRoutes(
         result.push({
           id: `kanban-${card.id}`,
           kanbanCardId: card.id,
-          title: cardTitle,
+          title: card.title,
           clientId: card.clientId,
           clientName: clientMap.get(card.clientId) || "Cliente",
           content: templateObj.caption || card.description || "",
@@ -2125,8 +2125,8 @@ export async function registerRoutes(
       details: `Cartão "${card.title}" criado`,
     });
 
-    if (TIMED_COLUMNS.includes(MANDATORY_FIRST_COLUMN) && user) {
-      await storage.startTimeEntry(card.id, user.id);
+    if (!TIMER_EXCLUDED_COLUMNS.includes(MANDATORY_FIRST_COLUMN) && user) {
+      await storage.startTimeEntry(card.id, user.id, targetColumnId);
     }
 
     res.json(card);
@@ -2209,14 +2209,14 @@ export async function registerRoutes(
         details: `Movido de "${fromCol?.title}" para "${toCol?.title}"`,
       });
 
-      if (fromCol && TIMED_COLUMNS.includes(fromCol.title)) {
+      if (fromCol && !TIMER_EXCLUDED_COLUMNS.includes(fromCol.title)) {
         const openEntry = await storage.getOpenTimeEntry(cardId);
         if (openEntry) {
           await storage.stopTimeEntry(openEntry.id);
         }
       }
-      if (toCol && TIMED_COLUMNS.includes(toCol.title) && user) {
-        await storage.startTimeEntry(cardId, user.id);
+      if (toCol && !TIMER_EXCLUDED_COLUMNS.includes(toCol.title) && user) {
+        await storage.startTimeEntry(cardId, user.id, toColumnId);
       }
     }
 
@@ -2257,14 +2257,14 @@ export async function registerRoutes(
       details: `Movido de "${fromCol?.title}" para "${targetCol.title}"`,
     });
 
-    if (fromCol && TIMED_COLUMNS.includes(fromCol.title)) {
+    if (fromCol && !TIMER_EXCLUDED_COLUMNS.includes(fromCol.title)) {
       const openEntry = await storage.getOpenTimeEntry(card.id);
       if (openEntry) {
         await storage.stopTimeEntry(openEntry.id);
       }
     }
-    if (targetCol && TIMED_COLUMNS.includes(targetCol.title) && userId) {
-      await storage.startTimeEntry(card.id, userId);
+    if (targetCol && !TIMER_EXCLUDED_COLUMNS.includes(targetCol.title) && userId) {
+      await storage.startTimeEntry(card.id, userId, targetCol.id);
     }
 
     return updated;
@@ -2699,6 +2699,59 @@ export async function registerRoutes(
     res.json(entries);
   });
 
+  app.get("/api/kanban/client/:clientId/column-times", requireAuth, async (req, res) => {
+    try {
+      const clientId = Number(req.params.clientId);
+      const cards = await storage.getKanbanCardsByClient(clientId);
+      const columns = await storage.getKanbanColumnsByClient(clientId);
+      const excludedColIds = new Set(
+        columns.filter(c => TIMER_EXCLUDED_COLUMNS.includes(c.title)).map(c => c.id)
+      );
+
+      const cardIds = cards.map(c => c.id);
+      const allEntries = cardIds.length > 0
+        ? await storage.getKanbanTimeEntriesByCardIds(cardIds)
+        : [];
+
+      const entriesByCard = new Map<number, typeof allEntries>();
+      for (const entry of allEntries) {
+        const list = entriesByCard.get(entry.cardId) || [];
+        list.push(entry);
+        entriesByCard.set(entry.cardId, list);
+      }
+
+      const result: Record<number, { accumulatedSeconds: number; openSince: string | null }> = {};
+
+      for (const card of cards) {
+        if (excludedColIds.has(card.columnId)) {
+          result[card.id] = { accumulatedSeconds: 0, openSince: null };
+          continue;
+        }
+
+        const entries = entriesByCard.get(card.id) || [];
+        const currentColEntries = entries.filter(e => e.columnId === card.columnId);
+
+        let accumulated = 0;
+        let openSince: string | null = null;
+
+        for (const entry of currentColEntries) {
+          if (entry.totalSeconds != null) {
+            accumulated += entry.totalSeconds;
+          } else if (!entry.endedAt) {
+            openSince = entry.startedAt ? new Date(entry.startedAt).toISOString() : null;
+          }
+        }
+
+        result[card.id] = { accumulatedSeconds: accumulated, openSince };
+      }
+
+      res.json(result);
+    } catch (err) {
+      console.error("Error getting column times:", err);
+      res.status(500).json({ message: "Erro ao buscar tempos" });
+    }
+  });
+
   app.get("/api/kanban/reports/designer", requireRole(...INTERNAL_ROLES), async (req, res) => {
     try {
       const allUsers = await storage.getUsers();
@@ -3063,6 +3116,96 @@ export async function registerRoutes(
   });
 
   registerLocalStorageRoutes(app);
+
+  // === CARD TIME REPORT ===
+  app.get("/api/reports/card-times", requireAuth, requireRole(...INTERNAL_ROLES), async (req, res) => {
+    try {
+      const { clientId } = req.query;
+      let allCards: any[] = [];
+
+      if (clientId) {
+        allCards = await storage.getKanbanCardsByClient(Number(clientId));
+      } else {
+        const clients = await storage.getClients();
+        for (const client of clients) {
+          const cards = await storage.getKanbanCardsByClient(client.id);
+          allCards.push(...cards);
+        }
+      }
+
+      if (allCards.length === 0) {
+        return res.json([]);
+      }
+
+      const cardIds = allCards.map(c => c.id);
+      const allEntries = await storage.getKanbanTimeEntriesByCardIds(cardIds);
+
+      const clientIds = [...new Set(allCards.map(c => c.clientId))];
+      const clientMap = new Map<number, string>();
+      const columnMap = new Map<number, string>();
+
+      for (const cId of clientIds) {
+        const client = await storage.getClient(cId);
+        if (client) clientMap.set(cId, client.name);
+        const cols = await storage.getKanbanColumnsByClient(cId);
+        for (const col of cols) {
+          columnMap.set(col.id, col.title);
+        }
+      }
+
+      const entriesByCard = new Map<number, typeof allEntries>();
+      for (const entry of allEntries) {
+        const list = entriesByCard.get(entry.cardId) || [];
+        list.push(entry);
+        entriesByCard.set(entry.cardId, list);
+      }
+
+      const result = allCards.map(card => {
+        const entries = entriesByCard.get(card.id) || [];
+
+        const byColumn: Record<string, { totalSeconds: number; entries: number; openSince: string | null }> = {};
+        const now = Date.now();
+
+        for (const entry of entries) {
+          const colName = entry.columnId ? (columnMap.get(entry.columnId) || `Col ${entry.columnId}`) : "Desconhecida";
+          if (!byColumn[colName]) {
+            byColumn[colName] = { totalSeconds: 0, entries: 0, openSince: null };
+          }
+          if (entry.totalSeconds != null) {
+            byColumn[colName].totalSeconds += entry.totalSeconds;
+            byColumn[colName].entries += 1;
+          } else if (!entry.endedAt && entry.startedAt) {
+            const elapsed = Math.max(0, Math.floor((now - new Date(entry.startedAt).getTime()) / 1000));
+            byColumn[colName].totalSeconds += elapsed;
+            byColumn[colName].openSince = new Date(entry.startedAt).toISOString();
+          }
+        }
+
+        let totalSeconds = 0;
+        for (const col of Object.values(byColumn)) {
+          totalSeconds += col.totalSeconds;
+        }
+        const currentColName = columnMap.get(card.columnId) || "Desconhecida";
+
+        return {
+          cardId: card.id,
+          cardTitle: card.title,
+          cardType: card.cardType || "geral",
+          clientId: card.clientId,
+          clientName: clientMap.get(card.clientId) || "",
+          currentColumn: currentColName,
+          totalSeconds,
+          columnTimes: byColumn,
+        };
+      });
+
+      result.sort((a, b) => b.totalSeconds - a.totalSeconds);
+      res.json(result);
+    } catch (err) {
+      console.error("Error getting card time report:", err);
+      res.status(500).json({ message: "Erro ao gerar relatório" });
+    }
+  });
 
   // === WORKFLOW REPORTS ===
   app.get("/api/reports/workflow", requireAuth, requireRole(...INTERNAL_ROLES), async (req, res) => {
