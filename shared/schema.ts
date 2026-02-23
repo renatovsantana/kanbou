@@ -43,6 +43,8 @@ export const clients = pgTable("clients", {
   marketTags: text("market_tags").array(),
   kanbanBgColor: text("kanban_bg_color"),
   kanbanBgImage: text("kanban_bg_image"),
+  enableReuniao: boolean("enable_reuniao").default(false),
+  enableCaptacao: boolean("enable_captacao").default(false),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -129,11 +131,14 @@ export const kanbanColumns = pgTable("kanban_columns", {
 export const CARD_TYPES = [
   "geral",
   "post",
+  "video",
   "material_offline",
   "material_digital",
   "copy",
   "roteiro",
   "identidade_visual",
+  "reuniao",
+  "captacao",
 ] as const;
 
 export type CardType = typeof CARD_TYPES[number];
@@ -141,21 +146,27 @@ export type CardType = typeof CARD_TYPES[number];
 export const CARD_TYPE_LABELS: Record<CardType, string> = {
   geral: "Geral",
   post: "Post",
+  video: "Vídeo",
   material_offline: "Material Offline",
   material_digital: "Material Digital",
   copy: "Copy",
   roteiro: "Roteiro",
   identidade_visual: "Identidade Visual",
+  reuniao: "Reunião",
+  captacao: "Captação",
 };
 
 export const CARD_TYPE_COLORS: Record<CardType, string> = {
   geral: "bg-gray-500",
   post: "bg-blue-500",
+  video: "bg-cyan-500",
   material_offline: "bg-amber-500",
   material_digital: "bg-purple-500",
   copy: "bg-emerald-500",
   roteiro: "bg-red-500",
   identidade_visual: "bg-pink-500",
+  reuniao: "bg-orange-500",
+  captacao: "bg-teal-500",
 };
 
 export interface CardTemplateField {
@@ -215,6 +226,38 @@ export const CARD_TYPE_FIELDS: Record<CardType, CardTemplateField[]> = {
     { key: "idDesc", label: "Descrição", type: "textarea" },
     { key: "references", label: "Referências Visuais", type: "textarea" },
     { key: "deadline", label: "Prazo de Entrega", type: "date" },
+    { key: "notes", label: "Observações", type: "textarea" },
+  ],
+  video: [
+    { key: "videoTitle", label: "Título do Vídeo", type: "text", required: true },
+    { key: "videoType", label: "Tipo de Vídeo", type: "select", options: ["Reels/Shorts", "Stories", "Feed", "Institucional", "Publicitário", "Tutorial", "Depoimento", "Outro"] },
+    { key: "duration", label: "Duração Prevista", type: "text" },
+    { key: "platform", label: "Plataformas", type: "multi-select", options: ["Instagram", "Facebook", "LinkedIn", "TikTok", "YouTube", "Blog"] },
+    { key: "caption", label: "Legenda", type: "textarea" },
+    { key: "roteiro", label: "Roteiro / Briefing", type: "textarea" },
+    { key: "format", label: "Formato", type: "select", options: ["Vertical (9:16)", "Horizontal (16:9)", "Quadrado (1:1)", "Outro"] },
+    { key: "publishDate", label: "Data de Publicação", type: "date" },
+    { key: "hashtags", label: "Hashtags", type: "text" },
+    { key: "notes", label: "Observações", type: "textarea" },
+  ],
+  reuniao: [
+    { key: "reuniaoTitle", label: "Título da Reunião", type: "text", required: true },
+    { key: "reuniaoType", label: "Tipo", type: "select", options: ["Alinhamento", "Planejamento", "Apresentação", "Aprovação", "Brainstorm", "Outro"] },
+    { key: "reuniaoDate", label: "Data da Reunião", type: "date" },
+    { key: "participants", label: "Participantes", type: "text" },
+    { key: "location", label: "Local / Link", type: "text" },
+    { key: "agenda", label: "Pauta", type: "textarea" },
+    { key: "notes", label: "Anotações", type: "textarea" },
+  ],
+  captacao: [
+    { key: "captacaoTitle", label: "Título", type: "text", required: true },
+    { key: "captacaoType", label: "Tipo de Captação", type: "select", options: ["Vídeo", "Fotografia", "Vídeo e Fotografia"] },
+    { key: "captacaoDate", label: "Data da Captação", type: "date" },
+    { key: "location", label: "Local", type: "text" },
+    { key: "equipment", label: "Equipamentos Necessários", type: "textarea" },
+    { key: "shotList", label: "Lista de Cenas / Fotos", type: "textarea" },
+    { key: "references", label: "Referências Visuais", type: "textarea" },
+    { key: "participants", label: "Equipe / Participantes", type: "text" },
     { key: "notes", label: "Observações", type: "textarea" },
   ],
 };
@@ -292,6 +335,13 @@ export const DEFAULT_KANBAN_COLUMNS = [
 ];
 
 export const MANDATORY_FIRST_COLUMN = "Fila";
+
+export const CONDITIONAL_COLUMNS = {
+  "Reunião": "enableReuniao",
+  "Captação": "enableCaptacao",
+} as const;
+
+export const CONDITIONAL_COLUMN_POSITION = 1;
 
 export const TIMED_COLUMNS = [
   "Fila",
@@ -580,11 +630,21 @@ export const clientOnboardingAccess = pgTable("client_onboarding_access", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const clientTextTemplates = pgTable("client_text_templates", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id").references(() => clients.id).notNull(),
+  name: text("name").notNull(),
+  content: text("content").notNull(),
+  position: integer("position").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const insertClientProductSchema = createInsertSchema(clientProducts).omit({ id: true, createdAt: true });
 export const insertClientServiceSchema = createInsertSchema(clientServices).omit({ id: true, createdAt: true });
 export const insertClientCredentialSchema = createInsertSchema(clientCredentials).omit({ id: true, createdAt: true });
 export const insertClientInsightSchema = createInsertSchema(clientInsights).omit({ id: true, createdAt: true });
 export const insertClientOnboardingAccessSchema = createInsertSchema(clientOnboardingAccess).omit({ id: true, createdAt: true });
+export const insertClientTextTemplateSchema = createInsertSchema(clientTextTemplates).omit({ id: true, createdAt: true });
 
 export type ClientCustomLink = typeof clientCustomLinks.$inferSelect;
 export type InsertClientCustomLink = typeof clientCustomLinks.$inferInsert;
@@ -604,14 +664,20 @@ export type InsertClientInsight = z.infer<typeof insertClientInsightSchema>;
 export type ClientOnboardingAccess = typeof clientOnboardingAccess.$inferSelect;
 export type InsertClientOnboardingAccess = z.infer<typeof insertClientOnboardingAccessSchema>;
 
+export type ClientTextTemplate = typeof clientTextTemplates.$inferSelect;
+export type InsertClientTextTemplate = z.infer<typeof insertClientTextTemplateSchema>;
+
 export const CARD_TYPE_BORDER_COLORS: Record<CardType, string> = {
   geral: "border-l-gray-400 dark:border-l-gray-500",
   post: "border-l-blue-500 dark:border-l-blue-400",
+  video: "border-l-cyan-500 dark:border-l-cyan-400",
   material_offline: "border-l-amber-500 dark:border-l-amber-400",
   material_digital: "border-l-purple-500 dark:border-l-purple-400",
   copy: "border-l-emerald-500 dark:border-l-emerald-400",
   roteiro: "border-l-red-500 dark:border-l-red-400",
   identidade_visual: "border-l-pink-500 dark:border-l-pink-400",
+  reuniao: "border-l-orange-500 dark:border-l-orange-400",
+  captacao: "border-l-teal-500 dark:border-l-teal-400",
 };
 
 // === BRAND IDENTITY FILES ===

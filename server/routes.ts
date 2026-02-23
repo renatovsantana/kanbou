@@ -3,7 +3,7 @@ import type { Server } from "http";
 import { randomUUID } from "crypto";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
-import { loginSchema, registerSchema, DEFAULT_KANBAN_COLUMNS, TIMED_COLUMNS, TIMER_EXCLUDED_COLUMNS, MANDATORY_FIRST_COLUMN, APPROVAL_STATUS_TO_COLUMN, PROTECTED_KANBAN_COLUMNS, insertClientProductSchema, insertClientServiceSchema, insertClientCredentialSchema, insertClientInsightSchema, isInternalRole, INTERNAL_ROLES } from "@shared/schema";
+import { loginSchema, registerSchema, DEFAULT_KANBAN_COLUMNS, CONDITIONAL_COLUMNS, CONDITIONAL_COLUMN_POSITION, TIMED_COLUMNS, TIMER_EXCLUDED_COLUMNS, MANDATORY_FIRST_COLUMN, APPROVAL_STATUS_TO_COLUMN, PROTECTED_KANBAN_COLUMNS, insertClientProductSchema, insertClientServiceSchema, insertClientCredentialSchema, insertClientInsightSchema, isInternalRole, INTERNAL_ROLES } from "@shared/schema";
 import { z } from "zod";
 import { hashPassword, verifyPassword, requireAuth, requireRole, getCurrentUser } from "./auth";
 import { registerLocalStorageRoutes } from "./local-storage";
@@ -1972,12 +1972,23 @@ export async function registerRoutes(
     if (user?.role === "client" && user.clientId !== clientId) {
       return res.status(403).json({ message: "Sem permissão" });
     }
+
+    const client = await storage.getClient(clientId);
+    const conditionalEnabled: string[] = [];
+    if (client?.enableReuniao) conditionalEnabled.push("Reunião");
+    if (client?.enableCaptacao) conditionalEnabled.push("Captação");
+
+    const allExpectedCols = [...DEFAULT_KANBAN_COLUMNS];
+    for (let i = conditionalEnabled.length - 1; i >= 0; i--) {
+      allExpectedCols.splice(CONDITIONAL_COLUMN_POSITION, 0, conditionalEnabled[i]);
+    }
+
     let columns = await storage.getKanbanColumnsByClient(clientId);
     if (columns.length === 0) {
-      for (let i = 0; i < DEFAULT_KANBAN_COLUMNS.length; i++) {
+      for (let i = 0; i < allExpectedCols.length; i++) {
         await storage.createKanbanColumn({
           clientId,
-          title: DEFAULT_KANBAN_COLUMNS[i],
+          title: allExpectedCols[i],
           position: i,
           isDefault: true,
         });
@@ -1986,7 +1997,7 @@ export async function registerRoutes(
     } else {
       const existingTitles = new Set(columns.map(c => c.title));
       const missingCols: string[] = [];
-      for (const requiredCol of DEFAULT_KANBAN_COLUMNS) {
+      for (const requiredCol of allExpectedCols) {
         if (!existingTitles.has(requiredCol)) {
           missingCols.push(requiredCol);
         }
@@ -1997,18 +2008,24 @@ export async function registerRoutes(
         }
         columns = await storage.getKanbanColumnsByClient(clientId);
       }
-      const defaultCols: typeof columns = [];
-      const customCols: typeof columns = [];
-      for (const col of columns) {
-        if (DEFAULT_KANBAN_COLUMNS.includes(col.title)) {
-          defaultCols.push(col);
+
+      const conditionalNames = Object.keys(CONDITIONAL_COLUMNS);
+      const disabledConditional = conditionalNames.filter(n => !conditionalEnabled.includes(n));
+
+      const visibleCols = columns.filter(c => !disabledConditional.includes(c.title));
+
+      const expectedCols: typeof columns = [];
+      const otherCols: typeof columns = [];
+      for (const col of visibleCols) {
+        if (allExpectedCols.includes(col.title)) {
+          expectedCols.push(col);
         } else {
-          customCols.push(col);
+          otherCols.push(col);
         }
       }
-      defaultCols.sort((a, b) => DEFAULT_KANBAN_COLUMNS.indexOf(a.title) - DEFAULT_KANBAN_COLUMNS.indexOf(b.title));
-      customCols.sort((a, b) => a.position - b.position);
-      const sorted = [...defaultCols, ...customCols];
+      expectedCols.sort((a, b) => allExpectedCols.indexOf(a.title) - allExpectedCols.indexOf(b.title));
+      otherCols.sort((a, b) => a.position - b.position);
+      const sorted = [...expectedCols, ...otherCols];
       let needsRefresh = false;
       for (let i = 0; i < sorted.length; i++) {
         if (sorted[i].position !== i) {
@@ -2019,6 +2036,7 @@ export async function registerRoutes(
       if (needsRefresh) {
         columns = await storage.getKanbanColumnsByClient(clientId);
       }
+      columns = columns.filter(c => !disabledConditional.includes(c.title));
     }
     res.json(columns);
   });
@@ -2927,6 +2945,26 @@ export async function registerRoutes(
   });
   app.delete("/api/onboarding/credentials/:id", requireAuth, requireRole(...INTERNAL_ROLES), async (req, res) => {
     await storage.deleteClientCredential(Number(req.params.id));
+    res.json({ success: true });
+  });
+
+  app.get("/api/onboarding/:clientId/text-templates", requireAuth, async (req, res) => {
+    const clientId = Number(req.params.clientId);
+    const templates = await storage.getClientTextTemplates(clientId);
+    res.json(templates);
+  });
+  app.post("/api/onboarding/:clientId/text-templates", requireAuth, async (req, res) => {
+    const clientId = Number(req.params.clientId);
+    if (!(await checkOnboardingAccess(req, clientId))) return res.status(403).json({ message: "Acesso negado" });
+    const template = await storage.createClientTextTemplate({ clientId, ...req.body });
+    res.json(template);
+  });
+  app.put("/api/onboarding/text-templates/:id", requireAuth, requireRole(...INTERNAL_ROLES), async (req, res) => {
+    const template = await storage.updateClientTextTemplate(Number(req.params.id), req.body);
+    res.json(template);
+  });
+  app.delete("/api/onboarding/text-templates/:id", requireAuth, requireRole(...INTERNAL_ROLES), async (req, res) => {
+    await storage.deleteClientTextTemplate(Number(req.params.id));
     res.json({ success: true });
   });
 

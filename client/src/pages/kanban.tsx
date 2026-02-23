@@ -388,6 +388,7 @@ function DroppableColumn({
   onDeleteColumn,
   onScheduleCard,
   columnTimesData,
+  clientId,
 }: {
   column: KanbanColumn;
   cards: KanbanCard[];
@@ -397,6 +398,7 @@ function DroppableColumn({
   onDeleteColumn: (column: KanbanColumn) => void;
   onScheduleCard?: (card: KanbanCard) => void;
   columnTimesData?: Record<number, { accumulatedSeconds: number; openSince: string | null }>;
+  clientId?: number;
 }) {
   const { setNodeRef } = useDroppable({ id: `column-${column.id}` });
   const [isEditing, setIsEditing] = useState(false);
@@ -547,6 +549,7 @@ function DroppableColumn({
             setIsAdding(false);
           }}
           columnTitle={column.title}
+          clientId={clientId}
         />
       </div>
     </div>
@@ -1297,6 +1300,7 @@ export default function KanbanBoard() {
                   onDeleteColumn={handleDeleteColumn}
                   onScheduleCard={setScheduleConfirmCard}
                   columnTimesData={columnTimesData}
+                  clientId={clientId || undefined}
                 />
               ))}
 

@@ -10,7 +10,6 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
@@ -28,16 +27,23 @@ import {
   Video,
   Palette,
   ArrowLeft,
+  Users,
+  Camera,
 } from "lucide-react";
+import { TextareaWithExtras } from "@/components/rich-text-editor";
+import { useQuery } from "@tanstack/react-query";
 
 const CARD_TYPE_ICONS: Record<CardType, React.ComponentType<{ className?: string }>> = {
   geral: LayoutGrid,
   post: Image,
+  video: Video,
   material_offline: Printer,
   material_digital: Monitor,
   copy: FileText,
-  roteiro: Video,
+  roteiro: FileText,
   identidade_visual: Palette,
+  reuniao: Users,
+  captacao: Camera,
 };
 
 interface KanbanCreateCardDialogProps {
@@ -45,6 +51,7 @@ interface KanbanCreateCardDialogProps {
   onClose: () => void;
   onSubmit: (data: { title: string; cardType: string; templateData: string }) => void;
   columnTitle: string;
+  clientId?: number;
 }
 
 export function KanbanCreateCardDialog({
@@ -52,7 +59,18 @@ export function KanbanCreateCardDialog({
   onClose,
   onSubmit,
   columnTitle,
+  clientId,
 }: KanbanCreateCardDialogProps) {
+  const { data: textTemplates } = useQuery<{ id: number; name: string; content: string }[]>({
+    queryKey: ["/api/onboarding", clientId, "text-templates"],
+    queryFn: async () => {
+      if (!clientId) return [];
+      const res = await fetch(`/api/onboarding/${clientId}/text-templates`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!clientId,
+  });
   const [step, setStep] = useState<1 | 2>(1);
   const [selectedType, setSelectedType] = useState<CardType | null>(null);
   const [title, setTitle] = useState("");
@@ -230,12 +248,13 @@ export function KanbanCreateCardDialog({
                   />
                 )}
                 {field.type === "textarea" && (
-                  <Textarea
+                  <TextareaWithExtras
                     value={fieldValues[field.key] || ""}
-                    onChange={(e) => handleFieldChange(field.key, e.target.value)}
+                    onChange={(val) => handleFieldChange(field.key, val)}
                     placeholder={field.label}
-                    className="min-h-[80px] resize-none"
-                    data-testid={`textarea-field-${field.key}`}
+                    templates={textTemplates}
+                    rows={3}
+                    testId={`textarea-field-${field.key}`}
                   />
                 )}
                 {field.type === "date" && (

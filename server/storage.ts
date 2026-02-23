@@ -56,6 +56,9 @@ import {
   clientCustomLinks,
   type ClientCustomLink,
   type InsertClientCustomLink,
+  clientTextTemplates,
+  type ClientTextTemplate,
+  type InsertClientTextTemplate,
   briefingTemplates,
   brandIdentityFiles,
   errorReports,
@@ -189,6 +192,11 @@ export interface IStorage {
 
   getOnboardingAccess(clientId: number): Promise<ClientOnboardingAccess[]>;
   setOnboardingAccess(clientId: number, userIds: number[]): Promise<void>;
+
+  getClientTextTemplates(clientId: number): Promise<ClientTextTemplate[]>;
+  createClientTextTemplate(template: InsertClientTextTemplate): Promise<ClientTextTemplate>;
+  updateClientTextTemplate(id: number, updates: Partial<InsertClientTextTemplate>): Promise<ClientTextTemplate>;
+  deleteClientTextTemplate(id: number): Promise<void>;
 
   getBrandIdentityFiles(clientId: number): Promise<BrandIdentityFile[]>;
   getBrandIdentityFile(id: number): Promise<BrandIdentityFile | undefined>;
@@ -752,6 +760,24 @@ export class DatabaseStorage implements IStorage {
     if (userIds.length > 0) {
       await db.insert(clientOnboardingAccess).values(userIds.map(userId => ({ clientId, userId })));
     }
+  }
+
+  async getClientTextTemplates(clientId: number): Promise<ClientTextTemplate[]> {
+    return await db.select().from(clientTextTemplates).where(eq(clientTextTemplates.clientId, clientId)).orderBy(asc(clientTextTemplates.position));
+  }
+
+  async createClientTextTemplate(template: InsertClientTextTemplate): Promise<ClientTextTemplate> {
+    const [t] = await db.insert(clientTextTemplates).values(template).returning();
+    return t;
+  }
+
+  async updateClientTextTemplate(id: number, updates: Partial<InsertClientTextTemplate>): Promise<ClientTextTemplate> {
+    const [t] = await db.update(clientTextTemplates).set(updates).where(eq(clientTextTemplates.id, id)).returning();
+    return t;
+  }
+
+  async deleteClientTextTemplate(id: number): Promise<void> {
+    await db.delete(clientTextTemplates).where(eq(clientTextTemplates.id, id));
   }
 
   async getBrandIdentityFiles(clientId: number): Promise<BrandIdentityFile[]> {

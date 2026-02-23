@@ -59,7 +59,10 @@ import {
   Sun,
   Moon,
   Pencil,
+  Settings2,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { SiInstagram, SiFacebook, SiTiktok, SiLinkedin, SiYoutube } from "react-icons/si";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -196,6 +199,9 @@ export default function ClientOnboarding() {
             <CredentialsSection clientId={clientId} credentials={credentials} />
             <BrandIdentitySection clientId={clientId} />
             <CompetitorsSection clientId={clientId} competitors={clientCompetitors} />
+            {isInternalRole(user?.role || "") && (
+              <KanbanSettingsSection clientId={clientId} client={clientObj} />
+            )}
             {user?.role === "admin" && (
               <AccessSection clientId={clientId} users={users} accessUserIds={accessUserIds} />
             )}
@@ -1097,6 +1103,192 @@ function AccessSection({ clientId, users, accessUserIds }: { clientId: number; u
           )}
         </div>
       )}
+    </Card>
+  );
+}
+
+interface ClientTextTemplate {
+  id: number;
+  clientId: number;
+  name: string;
+  content: string;
+  createdAt: string;
+}
+
+function KanbanSettingsSection({ clientId, client }: { clientId: number; client?: Client }) {
+  const { toast } = useToast();
+  const [editingTemplate, setEditingTemplate] = useState<ClientTextTemplate | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [templateForm, setTemplateForm] = useState({ name: "", content: "" });
+
+  const { data: textTemplates = [] } = useQuery<ClientTextTemplate[]>({
+    queryKey: ["/api/onboarding", clientId, "text-templates"],
+    enabled: !!clientId,
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: (data: { enableReuniao?: boolean; enableCaptacao?: boolean }) =>
+      apiRequest("PUT", `/api/clients/${clientId}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      toast({ title: "Configuração salva" });
+    },
+  });
+
+  const createTemplateMutation = useMutation({
+    mutationFn: (data: { name: string; content: string }) =>
+      apiRequest("POST", `/api/onboarding/${clientId}/text-templates`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/onboarding", clientId, "text-templates"] });
+      setAdding(false);
+      setTemplateForm({ name: "", content: "" });
+      toast({ title: "Template criado" });
+    },
+  });
+
+  const updateTemplateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: { name: string; content: string } }) =>
+      apiRequest("PUT", `/api/onboarding/text-templates/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/onboarding", clientId, "text-templates"] });
+      setEditingTemplate(null);
+      setTemplateForm({ name: "", content: "" });
+      toast({ title: "Template atualizado" });
+    },
+  });
+
+  const deleteTemplateMutation = useMutation({
+    mutationFn: (id: number) =>
+      apiRequest("DELETE", `/api/onboarding/text-templates/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/onboarding", clientId, "text-templates"] });
+      toast({ title: "Template removido" });
+    },
+  });
+
+  const startEditTemplate = (template: ClientTextTemplate) => {
+    setEditingTemplate(template);
+    setTemplateForm({ name: template.name, content: template.content });
+    setAdding(true);
+  };
+
+  const handleSubmitTemplate = () => {
+    if (!templateForm.name.trim()) return;
+    if (editingTemplate) {
+      updateTemplateMutation.mutate({ id: editingTemplate.id, data: templateForm });
+    } else {
+      createTemplateMutation.mutate(templateForm);
+    }
+  };
+
+  return (
+    <Card className="p-5" data-testid="section-kanban-settings">
+      <div className="flex items-center gap-2 mb-4">
+        <Settings2 className="w-4 h-4 text-primary" />
+        <h2 className="font-semibold">Configurações do Kanban</h2>
+      </div>
+
+      <div className="space-y-3 mb-5">
+        <div className="flex items-center justify-between gap-3 p-2.5 rounded-md bg-muted/20">
+          <Label htmlFor="toggle-reuniao" className="text-sm cursor-pointer">
+            Habilitar coluna Reunião
+          </Label>
+          <Switch
+            id="toggle-reuniao"
+            checked={client?.enableReuniao ?? false}
+            onCheckedChange={(checked) => toggleMutation.mutate({ enableReuniao: checked })}
+            disabled={toggleMutation.isPending}
+            data-testid="switch-enable-reuniao"
+          />
+        </div>
+        <div className="flex items-center justify-between gap-3 p-2.5 rounded-md bg-muted/20">
+          <Label htmlFor="toggle-captacao" className="text-sm cursor-pointer">
+            Habilitar coluna Captação
+          </Label>
+          <Switch
+            id="toggle-captacao"
+            checked={client?.enableCaptacao ?? false}
+            onCheckedChange={(checked) => toggleMutation.mutate({ enableCaptacao: checked })}
+            disabled={toggleMutation.isPending}
+            data-testid="switch-enable-captacao"
+          />
+        </div>
+      </div>
+
+      <div className="border-t pt-4">
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <div className="flex items-center gap-2">
+            <FileText className="w-4 h-4 text-primary" />
+            <h3 className="font-semibold text-sm">Templates de Texto</h3>
+            <Badge variant="secondary" className="text-xs no-default-hover-elevate no-default-active-elevate">{textTemplates.length}</Badge>
+          </div>
+          <Button variant="ghost" size="sm" onClick={() => { setAdding(true); setEditingTemplate(null); setTemplateForm({ name: "", content: "" }); }} data-testid="button-add-text-template">
+            <Plus className="w-4 h-4 mr-1" /> Adicionar
+          </Button>
+        </div>
+
+        {adding && (
+          <div className="border rounded-md p-3 mb-3 space-y-2 bg-muted/30">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Nome</label>
+              <Input
+                value={templateForm.name}
+                onChange={e => setTemplateForm(f => ({ ...f, name: e.target.value }))}
+                className="mt-1"
+                placeholder="Nome do template"
+                data-testid="input-template-name"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Conteúdo</label>
+              <Textarea
+                value={templateForm.content}
+                onChange={e => setTemplateForm(f => ({ ...f, content: e.target.value }))}
+                className="mt-1"
+                placeholder="Texto do template..."
+                rows={3}
+                data-testid="input-template-content"
+              />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button
+                size="sm"
+                onClick={handleSubmitTemplate}
+                disabled={createTemplateMutation.isPending || updateTemplateMutation.isPending || !templateForm.name.trim()}
+                data-testid="button-save-text-template"
+              >
+                <Save className="w-3.5 h-3.5 mr-1" /> {editingTemplate ? "Atualizar" : "Salvar"}
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => { setAdding(false); setEditingTemplate(null); }}>
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        )}
+
+        <div className="space-y-2">
+          {textTemplates.length === 0 && !adding ? (
+            <p className="text-sm text-muted-foreground">Nenhum template cadastrado.</p>
+          ) : (
+            textTemplates.map(template => (
+              <div key={template.id} className="flex items-start gap-3 p-2.5 rounded-md bg-muted/20 group" data-testid={`text-template-${template.id}`}>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium">{template.name}</p>
+                  <p className="text-xs text-muted-foreground whitespace-pre-wrap mt-0.5">{template.content}</p>
+                </div>
+                <div className="flex gap-1 shrink-0 invisible group-hover:visible">
+                  <Button variant="ghost" size="icon" onClick={() => startEditTemplate(template)} data-testid={`button-edit-template-${template.id}`}>
+                    <Pencil className="w-3 h-3" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="text-destructive" onClick={() => deleteTemplateMutation.mutate(template.id)} data-testid={`button-delete-template-${template.id}`}>
+                    <Trash2 className="w-3 h-3" />
+                  </Button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
     </Card>
   );
 }

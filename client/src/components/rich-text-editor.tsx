@@ -4,6 +4,7 @@ import Placeholder from "@tiptap/extension-placeholder";
 import Underline from "@tiptap/extension-underline";
 import TextAlign from "@tiptap/extension-text-align";
 import Highlight from "@tiptap/extension-highlight";
+import Link from "@tiptap/extension-link";
 import { Button } from "@/components/ui/button";
 import {
   Bold,
@@ -23,8 +24,19 @@ import {
   Undo,
   Redo,
   Pilcrow,
+  Smile,
+  FileText,
+  Link as LinkIcon,
 } from "lucide-react";
-import { useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import data from "@emoji-mart/data";
+import Picker from "@emoji-mart/react";
+
+interface TextTemplate {
+  id: number;
+  name: string;
+  content: string;
+}
 
 interface RichTextEditorProps {
   content: string;
@@ -32,6 +44,7 @@ interface RichTextEditorProps {
   placeholder?: string;
   editable?: boolean;
   minimal?: boolean;
+  templates?: TextTemplate[];
 }
 
 export function RichTextEditor({
@@ -40,7 +53,13 @@ export function RichTextEditor({
   placeholder = "Digite aqui...",
   editable = true,
   minimal = false,
+  templates,
 }: RichTextEditorProps) {
+  const [showEmoji, setShowEmoji] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const emojiRef = useRef<HTMLDivElement>(null);
+  const templateRef = useRef<HTMLDivElement>(null);
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -51,6 +70,10 @@ export function RichTextEditor({
       Highlight.configure({ multicolor: false }),
       TextAlign.configure({
         types: ["heading", "paragraph"],
+      }),
+      Link.configure({
+        openOnClick: false,
+        HTMLAttributes: { class: "underline text-foreground/80 hover:text-foreground" },
       }),
     ],
     content,
@@ -65,6 +88,41 @@ export function RichTextEditor({
       editor.commands.setContent(content || "");
     }
   }, [content]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (emojiRef.current && !emojiRef.current.contains(e.target as Node)) {
+        setShowEmoji(false);
+      }
+      if (templateRef.current && !templateRef.current.contains(e.target as Node)) {
+        setShowTemplates(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleEmojiSelect = useCallback((emoji: any) => {
+    if (editor) {
+      editor.chain().focus().insertContent(emoji.native).run();
+    }
+    setShowEmoji(false);
+  }, [editor]);
+
+  const handleTemplateInsert = useCallback((template: TextTemplate) => {
+    if (editor) {
+      editor.chain().focus().insertContent(template.content).run();
+    }
+    setShowTemplates(false);
+  }, [editor]);
+
+  const handleAddLink = useCallback(() => {
+    if (!editor) return;
+    const url = window.prompt("URL do link:");
+    if (url) {
+      editor.chain().focus().setLink({ href: url }).run();
+    }
+  }, [editor]);
 
   if (!editor) return null;
 
@@ -97,7 +155,7 @@ export function RichTextEditor({
   const Separator = () => <div className="w-px h-5 bg-border mx-0.5" />;
 
   return (
-    <div className="border rounded-md overflow-hidden bg-background">
+    <div className="border rounded-md overflow-visible bg-background relative">
       {editable && (
         <div className="flex items-center gap-0.5 p-1.5 border-b bg-muted/30 flex-wrap">
           <ToolBtn
@@ -140,6 +198,60 @@ export function RichTextEditor({
           >
             <Highlighter className="w-3.5 h-3.5" />
           </ToolBtn>
+
+          <Separator />
+
+          <div className="relative" ref={emojiRef}>
+            <ToolBtn
+              onClick={() => { setShowEmoji(!showEmoji); setShowTemplates(false); }}
+              title="Emojis"
+              testId="button-emoji"
+            >
+              <Smile className="w-3.5 h-3.5" />
+            </ToolBtn>
+            {showEmoji && (
+              <div className="absolute top-full left-0 z-[9999] mt-1 shadow-xl rounded-lg">
+                <Picker
+                  data={data}
+                  onEmojiSelect={handleEmojiSelect}
+                  theme="light"
+                  locale="pt"
+                  previewPosition="none"
+                  skinTonePosition="search"
+                  perLine={8}
+                  maxFrequentRows={2}
+                />
+              </div>
+            )}
+          </div>
+
+          {templates && templates.length > 0 && (
+            <div className="relative" ref={templateRef}>
+              <ToolBtn
+                onClick={() => { setShowTemplates(!showTemplates); setShowEmoji(false); }}
+                title="Inserir template de texto"
+                testId="button-insert-template"
+              >
+                <FileText className="w-3.5 h-3.5" />
+              </ToolBtn>
+              {showTemplates && (
+                <div className="absolute top-full left-0 z-[9999] mt-1 bg-popover border rounded-lg shadow-xl p-1 min-w-[200px] max-w-[300px] max-h-[250px] overflow-y-auto">
+                  <p className="text-xs text-muted-foreground px-2 py-1 font-medium">Inserir template</p>
+                  {templates.map(t => (
+                    <button
+                      key={t.id}
+                      className="w-full text-left px-2 py-1.5 text-sm rounded hover:bg-muted transition-colors truncate"
+                      onClick={() => handleTemplateInsert(t)}
+                      title={t.content}
+                      data-testid={`button-template-${t.id}`}
+                    >
+                      {t.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {!minimal && (
             <>
@@ -199,6 +311,14 @@ export function RichTextEditor({
                 testId="button-horizontal-rule"
               >
                 <Minus className="w-3.5 h-3.5" />
+              </ToolBtn>
+              <ToolBtn
+                active={editor.isActive("link")}
+                onClick={handleAddLink}
+                title="Inserir link"
+                testId="button-link"
+              >
+                <LinkIcon className="w-3.5 h-3.5" />
               </ToolBtn>
               <Separator />
               <ToolBtn
@@ -260,5 +380,142 @@ export function RichTextDisplay({ content }: { content: string }) {
       className="prose prose-sm dark:prose-invert max-w-none"
       dangerouslySetInnerHTML={{ __html: content }}
     />
+  );
+}
+
+interface TextareaWithExtrasProps {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  templates?: TextTemplate[];
+  rows?: number;
+  className?: string;
+  testId?: string;
+}
+
+export function TextareaWithExtras({
+  value,
+  onChange,
+  placeholder,
+  templates,
+  rows = 4,
+  className = "",
+  testId,
+}: TextareaWithExtrasProps) {
+  const [showEmoji, setShowEmoji] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const emojiRef = useRef<HTMLDivElement>(null);
+  const templateRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (emojiRef.current && !emojiRef.current.contains(e.target as Node)) {
+        setShowEmoji(false);
+      }
+      if (templateRef.current && !templateRef.current.contains(e.target as Node)) {
+        setShowTemplates(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const insertAtCursor = useCallback((text: string) => {
+    const textarea = textareaRef.current;
+    if (!textarea) {
+      onChange(value + text);
+      return;
+    }
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const newValue = value.substring(0, start) + text + value.substring(end);
+    onChange(newValue);
+    setTimeout(() => {
+      textarea.focus();
+      textarea.selectionStart = textarea.selectionEnd = start + text.length;
+    }, 0);
+  }, [value, onChange]);
+
+  const handleEmojiSelect = useCallback((emoji: any) => {
+    insertAtCursor(emoji.native);
+    setShowEmoji(false);
+  }, [insertAtCursor]);
+
+  const handleTemplateInsert = useCallback((template: TextTemplate) => {
+    insertAtCursor(template.content);
+    setShowTemplates(false);
+  }, [insertAtCursor]);
+
+  return (
+    <div className="relative">
+      <div className="flex items-center gap-1 mb-1">
+        <div className="relative" ref={emojiRef}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => { setShowEmoji(!showEmoji); setShowTemplates(false); }}
+            title="Emojis"
+            data-testid={`${testId}-emoji-btn`}
+          >
+            <Smile className="w-3.5 h-3.5" />
+          </Button>
+          {showEmoji && (
+            <div className="absolute top-full left-0 z-[9999] mt-1 shadow-xl rounded-lg">
+              <Picker
+                data={data}
+                onEmojiSelect={handleEmojiSelect}
+                theme="light"
+                locale="pt"
+                previewPosition="none"
+                skinTonePosition="search"
+                perLine={8}
+                maxFrequentRows={2}
+              />
+            </div>
+          )}
+        </div>
+        {templates && templates.length > 0 && (
+          <div className="relative" ref={templateRef}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => { setShowTemplates(!showTemplates); setShowEmoji(false); }}
+              title="Inserir template"
+              data-testid={`${testId}-template-btn`}
+            >
+              <FileText className="w-3.5 h-3.5" />
+            </Button>
+            {showTemplates && (
+              <div className="absolute top-full left-0 z-[9999] mt-1 bg-popover border rounded-lg shadow-xl p-1 min-w-[200px] max-w-[300px] max-h-[250px] overflow-y-auto">
+                <p className="text-xs text-muted-foreground px-2 py-1 font-medium">Inserir template</p>
+                {templates.map(t => (
+                  <button
+                    key={t.id}
+                    className="w-full text-left px-2 py-1.5 text-sm rounded hover:bg-muted transition-colors truncate"
+                    onClick={() => handleTemplateInsert(t)}
+                    title={t.content}
+                    data-testid={`${testId}-template-${t.id}`}
+                  >
+                    {t.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      <textarea
+        ref={textareaRef}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        rows={rows}
+        className={`flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-y ${className}`}
+        data-testid={testId}
+      />
+    </div>
   );
 }
