@@ -1996,23 +1996,27 @@ export async function registerRoutes(
           await storage.createKanbanColumn({ clientId, title, position: 999, isDefault: true });
         }
         columns = await storage.getKanbanColumnsByClient(clientId);
-        const defaultCols: typeof columns = [];
-        const customCols: typeof columns = [];
-        for (const col of columns) {
-          if (DEFAULT_KANBAN_COLUMNS.includes(col.title)) {
-            defaultCols.push(col);
-          } else {
-            customCols.push(col);
-          }
+      }
+      const defaultCols: typeof columns = [];
+      const customCols: typeof columns = [];
+      for (const col of columns) {
+        if (DEFAULT_KANBAN_COLUMNS.includes(col.title)) {
+          defaultCols.push(col);
+        } else {
+          customCols.push(col);
         }
-        defaultCols.sort((a, b) => DEFAULT_KANBAN_COLUMNS.indexOf(a.title) - DEFAULT_KANBAN_COLUMNS.indexOf(b.title));
-        customCols.sort((a, b) => a.position - b.position);
-        const sorted = [...defaultCols, ...customCols];
-        for (let i = 0; i < sorted.length; i++) {
-          if (sorted[i].position !== i) {
-            await storage.updateKanbanColumn(sorted[i].id, { position: i });
-          }
+      }
+      defaultCols.sort((a, b) => DEFAULT_KANBAN_COLUMNS.indexOf(a.title) - DEFAULT_KANBAN_COLUMNS.indexOf(b.title));
+      customCols.sort((a, b) => a.position - b.position);
+      const sorted = [...defaultCols, ...customCols];
+      let needsRefresh = false;
+      for (let i = 0; i < sorted.length; i++) {
+        if (sorted[i].position !== i) {
+          await storage.updateKanbanColumn(sorted[i].id, { position: i });
+          needsRefresh = true;
         }
+      }
+      if (needsRefresh) {
         columns = await storage.getKanbanColumnsByClient(clientId);
       }
     }
