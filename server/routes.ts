@@ -1053,7 +1053,7 @@ export async function registerRoutes(
   app.put("/api/notifications/read-all", requireAuth, async (req, res) => {
     const user = await getCurrentUser(req);
     if (!user) return res.status(401).json({ message: "Não autenticado" });
-    await storage.markAllNotificationsRead(user.id);
+    await storage.markAllNotificationsRead(user.role, user.clientId ?? undefined);
     res.json({ success: true });
   });
 
@@ -2164,6 +2164,21 @@ export async function registerRoutes(
       await storage.startTimeEntry(card.id, user.id, targetColumnId);
     }
 
+    await storage.createNotification({
+      clientId: card.clientId,
+      type: "card_created",
+      message: `"${card.title}" criado por ${user?.name || "Usuário"}`,
+      recipientRole: user?.role === "client" ? "admin" : "client",
+    });
+    if (user && isInternalRole(user.role)) {
+      await storage.createNotification({
+        clientId: card.clientId,
+        type: "card_created",
+        message: `"${card.title}" criado por ${user.name || "Usuário"}`,
+        recipientRole: user.role === "admin" ? "designer" : "admin",
+      });
+    }
+
     res.json(card);
   });
 
@@ -2253,6 +2268,23 @@ export async function registerRoutes(
       if (toCol && !TIMER_EXCLUDED_COLUMNS.includes(toCol.title) && user) {
         await storage.startTimeEntry(cardId, user.id, toColumnId);
       }
+
+      const moveMsg = `"${card.title}" movido de "${fromCol?.title}" para "${toCol?.title}" por ${user?.name || "Usuário"}`;
+      if (user && isInternalRole(user.role)) {
+        await storage.createNotification({
+          clientId: card.clientId,
+          type: "card_moved",
+          message: moveMsg,
+          recipientRole: "client",
+        });
+      } else if (user?.role === "client") {
+        await storage.createNotification({
+          clientId: card.clientId,
+          type: "card_moved",
+          message: moveMsg,
+          recipientRole: "admin",
+        });
+      }
     }
 
     res.json(card);
@@ -2289,6 +2321,13 @@ export async function registerRoutes(
       if (user) {
         await storage.startTimeEntry(cardId, user.id, filaCol.id);
       }
+
+      await storage.createNotification({
+        clientId: card.clientId,
+        type: "card_moved",
+        message: `"${card.title}" retornado para Fila por ${user?.name || "Usuário"}`,
+        recipientRole: "client",
+      });
 
       res.json(updated);
     } catch (err) {
@@ -2420,6 +2459,12 @@ export async function registerRoutes(
       message: `"${card.title}" foi aprovado por ${user?.name || "Cliente"}`,
       recipientRole: "admin",
     });
+    await storage.createNotification({
+      clientId: card.clientId,
+      type: "card_approved",
+      message: `"${card.title}" foi aprovado por ${user?.name || "Cliente"}`,
+      recipientRole: "designer",
+    });
 
     try {
       const client = await storage.getClient(card.clientId);
@@ -2529,6 +2574,12 @@ export async function registerRoutes(
       message: `"${card.title}" foi reprovado por ${user?.name || "Cliente"}${notes ? `: ${notes}` : ""}`,
       recipientRole: "admin",
     });
+    await storage.createNotification({
+      clientId: card.clientId,
+      type: "card_rejected",
+      message: `"${card.title}" foi reprovado por ${user?.name || "Cliente"}${notes ? `: ${notes}` : ""}`,
+      recipientRole: "designer",
+    });
 
     res.json(moved);
   });
@@ -2573,6 +2624,12 @@ export async function registerRoutes(
       message: `"${card.title}" precisa de revisão${notes ? `: ${notes}` : ""}`,
       recipientRole: "admin",
     });
+    await storage.createNotification({
+      clientId: card.clientId,
+      type: "revision_requested",
+      message: `"${card.title}" precisa de revisão${notes ? `: ${notes}` : ""}`,
+      recipientRole: "designer",
+    });
 
     res.json(moved);
   });
@@ -2609,6 +2666,14 @@ export async function registerRoutes(
       userId: user?.id ?? null,
       action: "undo_approval",
       details: `Decisão "${previousStatus}" desfeita, voltou para aprovação`,
+    });
+
+    const undoRecipient = user.role === "client" ? "admin" : "client";
+    await storage.createNotification({
+      clientId: card.clientId,
+      type: "approval_sent",
+      message: `"${card.title}" - decisão desfeita por ${user.name || "Usuário"}, voltou para aprovação`,
+      recipientRole: undoRecipient,
     });
 
     res.json(moved);
@@ -2746,13 +2811,43 @@ export async function registerRoutes(
 
     const card = await storage.getKanbanCard(cardId);
     if (card) {
-      const recipientRole = user.role === "client" ? "admin" : "client";
-      await storage.createNotification({
-        clientId: card.clientId,
-        type: "comment_added",
-        message: `${user.name} comentou em "${card.title}": ${req.body.content.substring(0, 80)}${req.body.content.length > 80 ? "..." : ""}`,
-        recipientRole,
-      });
+      const commentMsg = `${user.name} comentou em "${card.title}": ${req.body.content.substring(0, 80)}${req.body.content.length > 80 ? "..." : ""}`;
+      if (user.role === "client") {
+        await storage.createNotification({
+          clientId: card.clientId,
+          type: "comment_added",
+          message: commentMsg,
+          recipientRole: "admin",
+        });
+        await storage.createNotification({
+          clientId: card.clientId,
+          type: "comment_added",
+          message: commentMsg,
+          recipientRole: "designer",
+        });
+      } else {
+        await storage.createNotification({
+          clientId: card.clientId,
+          type: "comment_added",
+          message: commentMsg,
+          recipientRole: "client",
+        });
+        if (user.role === "admin") {
+          await storage.createNotification({
+            clientId: card.clientId,
+            type: "comment_added",
+            message: commentMsg,
+            recipientRole: "designer",
+          });
+        } else if (user.role === "designer") {
+          await storage.createNotification({
+            clientId: card.clientId,
+            type: "comment_added",
+            message: commentMsg,
+            recipientRole: "admin",
+          });
+        }
+      }
     }
 
     res.json(comment);

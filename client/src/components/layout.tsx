@@ -92,6 +92,8 @@ function NotificationBell({
       case "revision_requested": return "Revisão solicitada";
       case "comment_added": return "Comentário";
       case "card_scheduled": return "Agendado";
+      case "card_created": return "Novo cartão";
+      case "card_moved": return "Movimentação";
       case "insight": return "Insight";
       default: return "Notificação";
     }
@@ -105,6 +107,8 @@ function NotificationBell({
       case "approval_sent": return "text-blue-500";
       case "comment_added": return "text-purple-500";
       case "card_scheduled": return "text-cyan-500";
+      case "card_created": return "text-teal-500";
+      case "card_moved": return "text-indigo-500";
       case "insight": return "text-amber-500";
       default: return "text-muted-foreground";
     }
@@ -306,7 +310,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   const unreadNotifications = notifications.filter(n => !n.isRead);
 
-  const kanbanNotifTypes = ["approval_sent", "card_approved", "card_rejected", "revision_requested", "comment_added", "card_scheduled"];
+  const kanbanNotifTypes = ["approval_sent", "card_approved", "card_rejected", "revision_requested", "comment_added", "card_scheduled", "card_created", "card_moved"];
   const kanbanUnread = unreadNotifications.filter(n => kanbanNotifTypes.includes(n.type));
   const insightUnread = unreadNotifications.filter(n => n.type === "insight");
 

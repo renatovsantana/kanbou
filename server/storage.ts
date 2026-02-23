@@ -113,7 +113,7 @@ export interface IStorage {
   getNotificationsByClient(clientId: number): Promise<Notification[]>;
   createNotification(notification: InsertNotification): Promise<Notification>;
   markNotificationRead(id: number): Promise<Notification>;
-  markAllNotificationsRead(recipientUserId: number): Promise<void>;
+  markAllNotificationsRead(role: string, clientId?: number): Promise<void>;
   markInsightNotificationsRead(role: string, clientId?: number): Promise<void>;
   markKanbanNotificationsRead(role: string, clientId?: number): Promise<void>;
 
@@ -420,25 +420,45 @@ export class DatabaseStorage implements IStorage {
     return n;
   }
 
-  async markAllNotificationsRead(recipientUserId: number): Promise<void> {
+  async markAllNotificationsRead(role: string, clientId?: number): Promise<void> {
+    const conditions = [eq(notifications.isRead, false)];
+    if (role === "client" && clientId) {
+      conditions.push(eq(notifications.recipientRole, "client"));
+      conditions.push(eq(notifications.clientId, clientId));
+    } else if (role === "client") {
+      conditions.push(eq(notifications.recipientRole, "client"));
+    } else {
+      conditions.push(
+        or(
+          eq(notifications.recipientRole, "admin"),
+          eq(notifications.recipientRole, "designer"),
+          eq(notifications.recipientRole, "all"),
+        )!
+      );
+    }
     await db.update(notifications)
       .set({ isRead: true })
-      .where(eq(notifications.recipientUserId, recipientUserId));
+      .where(and(...conditions));
   }
 
   async markKanbanNotificationsRead(role: string, clientId?: number): Promise<void> {
-    const kanbanTypes = ["approval_sent", "card_approved", "card_rejected", "revision_requested", "comment_added", "card_scheduled"];
+    const kanbanTypes = ["approval_sent", "card_approved", "card_rejected", "revision_requested", "comment_added", "card_scheduled", "card_created", "card_moved"];
     const conditions = [
       eq(notifications.isRead, false),
     ];
     if (role === "client" && clientId) {
       conditions.push(eq(notifications.recipientRole, "client"));
       conditions.push(eq(notifications.clientId, clientId));
-    } else if (clientId) {
-      conditions.push(eq(notifications.recipientRole, role));
-      conditions.push(eq(notifications.clientId, clientId));
+    } else if (role === "client") {
+      conditions.push(eq(notifications.recipientRole, "client"));
     } else {
-      conditions.push(eq(notifications.recipientRole, role));
+      conditions.push(
+        or(
+          eq(notifications.recipientRole, "admin"),
+          eq(notifications.recipientRole, "designer"),
+          eq(notifications.recipientRole, "all"),
+        )!
+      );
     }
     await db.update(notifications)
       .set({ isRead: true })
@@ -453,8 +473,16 @@ export class DatabaseStorage implements IStorage {
     if (role === "client" && clientId) {
       conditions.push(eq(notifications.recipientRole, "client"));
       conditions.push(eq(notifications.clientId, clientId));
+    } else if (role === "client") {
+      conditions.push(eq(notifications.recipientRole, "client"));
     } else {
-      conditions.push(eq(notifications.recipientRole, role));
+      conditions.push(
+        or(
+          eq(notifications.recipientRole, "admin"),
+          eq(notifications.recipientRole, "designer"),
+          eq(notifications.recipientRole, "all"),
+        )!
+      );
     }
     await db.update(notifications)
       .set({ isRead: true })
