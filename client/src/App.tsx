@@ -22,6 +22,7 @@ import ClientOnboarding from "@/pages/client-onboarding";
 import ErrorReportsPage from "@/pages/error-reports";
 import InsightsPage from "@/pages/insights";
 import SettingsPage from "@/pages/settings";
+import DocumentacaoPage from "@/pages/documentacao";
 import LoginPage from "@/pages/login";
 import NotFound from "@/pages/not-found";
 import { Loader2 } from "lucide-react";
@@ -57,6 +58,7 @@ function ProtectedRouter() {
         <Route path="/aprovacoes" component={ClientApprovals} />
         <Route path="/error-reports" component={ErrorReportsPage} />
         <Route path="/settings" component={SettingsPage} />
+        <Route path="/documentacao" component={DocumentacaoPage} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

@@ -3702,6 +3702,18 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/documentacao", requireAuth, async (_req, res) => {
+    try {
+      const fs = await import("fs");
+      const path = await import("path");
+      const filePath = path.resolve("DOCUMENTACAO.md");
+      const content = fs.readFileSync(filePath, "utf-8");
+      res.type("text/plain").send(content);
+    } catch (err) {
+      res.status(404).send("Documentação não encontrada");
+    }
+  });
+
   await seedDatabase();
 
   return httpServer;

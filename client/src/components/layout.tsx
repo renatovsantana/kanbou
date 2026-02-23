@@ -30,6 +30,7 @@ import {
   Settings,
   Lightbulb,
   CalendarCheck,
+  Book,
 } from "lucide-react";
 import { useState, useMemo, useEffect, useRef, useCallback, createContext, useContext } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -637,6 +638,23 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </div>
 
       <div className="p-4 mt-auto space-y-3">
+        <Link href="/documentacao" onClick={() => setIsMobileMenuOpen(false)}>
+          <div
+            className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm cursor-pointer transition-colors ${
+              location === "/documentacao"
+                ? "font-medium"
+                : ""
+            }`}
+            style={{
+              background: location === "/documentacao" ? 'hsl(var(--sidebar-muted))' : 'transparent',
+              color: location === "/documentacao" ? 'hsl(var(--sidebar-fg) / 0.9)' : 'hsl(var(--sidebar-fg) / 0.5)',
+            }}
+            data-testid="link-documentacao"
+          >
+            <Book className="w-4 h-4" />
+            Documentação
+          </div>
+        </Link>
         <div className="flex items-center justify-between px-3 py-2 rounded-lg" style={{ background: 'hsl(var(--sidebar-muted) / 0.5)' }}>
           <div className="flex items-center gap-2">
             {theme === "dark" ? (
