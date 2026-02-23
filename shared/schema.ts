@@ -95,6 +95,7 @@ export const notifications = pgTable("notifications", {
   id: serial("id").primaryKey(),
   clientId: integer("client_id").references(() => clients.id),
   approvalPostId: integer("approval_post_id").references(() => approvalPosts.id),
+  kanbanCardId: integer("kanban_card_id"),
   type: text("type").notNull(),
   message: text("message").notNull(),
   isRead: boolean("is_read").default(false),

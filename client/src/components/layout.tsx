@@ -313,6 +313,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const kanbanNotifTypes = ["approval_sent", "card_approved", "card_rejected", "revision_requested", "comment_added", "card_scheduled", "card_created", "card_moved"];
   const kanbanUnread = unreadNotifications.filter(n => kanbanNotifTypes.includes(n.type));
   const insightUnread = unreadNotifications.filter(n => n.type === "insight");
+  const approvalNotifTypes = ["approval_sent"];
+  const approvalUnread = unreadNotifications.filter(n => approvalNotifTypes.includes(n.type));
 
   const kanbanNotifByClient = useMemo(() => {
     const map: Record<number, number> = {};
@@ -606,9 +608,28 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {role === "client" && (
           <>
             <NavSection label="Geral" items={dashboardNav} />
-            <NavSection label="Materiais" items={[
-              { name: "Aprovações", href: "/aprovacoes", icon: CheckSquare },
-            ]} />
+            <div className="mb-5">
+              <p className="px-3 text-[10px] font-semibold uppercase tracking-[0.15em] mb-2" style={{ color: 'hsl(var(--sidebar-fg) / 0.3)' }}>
+                Materiais
+              </p>
+              <div className="space-y-0.5">
+                <Link href="/aprovacoes">
+                  <div
+                    className={`sidebar-link ${location === "/aprovacoes" ? "active" : ""}`}
+                    data-testid="nav-aprovacoes"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <CheckSquare className="w-[18px] h-[18px] sidebar-link-icon" />
+                    Aprovações
+                    {approvalUnread.length > 0 && (
+                      <span className="ml-auto inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold rounded-full bg-red-500 text-white">
+                        {approvalUnread.length}
+                      </span>
+                    )}
+                  </div>
+                </Link>
+              </div>
+            </div>
             <NavSection label="Briefing" items={briefingNav} />
             <InsightsSection />
           </>

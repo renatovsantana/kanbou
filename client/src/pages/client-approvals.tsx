@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -43,6 +43,15 @@ export default function ClientApprovals() {
   const { data: cards = [], isLoading } = useQuery<KanbanCard[]>({
     queryKey: ["/api/client/approval-cards"],
   });
+
+  useEffect(() => {
+    if (selectedCard) {
+      apiRequest("PUT", `/api/notifications/read-by-card/${selectedCard.id}`).then(() => {
+        queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
+      }).catch(() => {});
+    }
+  }, [selectedCard]);
 
   const approveMutation = useMutation({
     mutationFn: async ({ cardId, notes }: { cardId: number; notes?: string }) => {
@@ -166,11 +175,15 @@ export default function ClientApprovals() {
     if (!card.attachments) return [];
     try {
       return JSON.parse(card.attachments) as Array<{
-        id: number;
-        filename: string;
+        id: string;
+        name: string;
         url: string;
-        type: string;
+        contentType: string;
         size: number;
+        driveFileId?: string;
+        driveUrl?: string;
+        driveDownloadUrl?: string;
+        thumbnailUrl?: string | null;
       }>;
     } catch {
       return [];
@@ -301,7 +314,7 @@ export default function ClientApprovals() {
           <div className="grid gap-3">
             {groupedByType[type].map(card => {
               const attachments = getAttachments(card);
-              const imageAttachments = attachments.filter(a => a.type?.startsWith("image/"));
+              const imageAttachments = attachments.filter(a => a.contentType?.startsWith("image/"));
 
               return (
                 <Card
@@ -349,8 +362,8 @@ export default function ClientApprovals() {
                       {imageAttachments.length > 0 && (
                         <div className="w-20 h-20 rounded-md overflow-hidden shrink-0 bg-muted">
                           <img
-                            src={imageAttachments[0].url}
-                            alt={imageAttachments[0].filename}
+                            src={imageAttachments[0].thumbnailUrl || (imageAttachments[0].driveFileId ? `/api/drive-proxy/${imageAttachments[0].driveFileId}` : imageAttachments[0].url)}
+                            alt={imageAttachments[0].name}
                             className="w-full h-full object-cover"
                           />
                         </div>
@@ -406,41 +419,79 @@ export default function ClientApprovals() {
                   </div>
                 )}
 
-                {getAttachments(selectedCard).length > 0 && (
-                  <div>
-                    <h4 className="text-sm font-medium mb-2 text-muted-foreground">Anexos</h4>
-                    <div className="grid grid-cols-2 gap-2">
-                      {getAttachments(selectedCard).map((att, idx) => (
-                        <div key={idx}>
-                          {att.type?.startsWith("image/") ? (
-                            <a href={att.url} target="_blank" rel="noopener noreferrer" className="block">
-                              <div className="rounded-md overflow-hidden bg-muted border aspect-video">
-                                <img
-                                  src={att.url}
-                                  alt={att.filename}
-                                  className="w-full h-full object-cover"
-                                />
-                              </div>
-                              <p className="text-xs text-muted-foreground mt-1 truncate">{att.filename}</p>
-                            </a>
-                          ) : (
-                            <a
-                              href={att.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-2 p-2 rounded-md border hover-elevate"
-                              data-testid={`link-attachment-${idx}`}
-                            >
-                              <FileIcon className="w-4 h-4 text-muted-foreground shrink-0" />
-                              <span className="text-sm truncate">{att.filename}</span>
-                              <Download className="w-3.5 h-3.5 ml-auto text-muted-foreground shrink-0" />
-                            </a>
-                          )}
+                {getAttachments(selectedCard).length > 0 && (() => {
+                  const atts = getAttachments(selectedCard);
+                  const imageAtts = atts.filter(a => a.contentType?.startsWith("image/"));
+                  const fileAtts = atts.filter(a => !a.contentType?.startsWith("image/"));
+                  return (
+                    <div>
+                      {imageAtts.length > 0 && (
+                        <div className="mb-4">
+                          <h4 className="text-sm font-medium mb-2 text-muted-foreground flex items-center gap-2">
+                            <Eye className="w-4 h-4" />
+                            Prévia dos materiais ({imageAtts.length} {imageAtts.length === 1 ? "imagem" : "imagens"})
+                          </h4>
+                          <div className="space-y-3">
+                            {imageAtts.map((att) => {
+                              const proxyUrl = att.driveFileId ? `/api/drive-proxy/${att.driveFileId}` : att.thumbnailUrl || att.url;
+                              const driveViewUrl = att.driveUrl || att.url;
+                              const dlUrl = att.driveDownloadUrl || att.url;
+                              return (
+                                <div key={att.id} className="rounded-lg overflow-hidden border bg-muted/30" data-testid={`preview-image-${att.id}`}>
+                                  <div className="w-full flex items-center justify-center bg-black/5 min-h-[200px] max-h-[500px]">
+                                    <img
+                                      src={proxyUrl}
+                                      alt={att.name}
+                                      className="max-w-full max-h-[500px] object-contain"
+                                      loading="lazy"
+                                    />
+                                  </div>
+                                  <div className="flex items-center gap-2 px-3 py-2 bg-background/80">
+                                    <span className="text-xs text-muted-foreground flex-1 truncate">{att.name}</span>
+                                    <a href={driveViewUrl} target="_blank" rel="noopener noreferrer" title="Ver no Drive">
+                                      <Button variant="ghost" size="sm" className="h-7 text-xs gap-1">
+                                        <Eye className="w-3.5 h-3.5" /> Drive
+                                      </Button>
+                                    </a>
+                                    <a href={dlUrl} target="_blank" rel="noopener noreferrer" title="Baixar em alta resolução">
+                                      <Button variant="ghost" size="sm" className="h-7 text-xs gap-1">
+                                        <Download className="w-3.5 h-3.5" /> Baixar
+                                      </Button>
+                                    </a>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
-                      ))}
+                      )}
+                      {fileAtts.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-medium mb-2 text-muted-foreground">Outros anexos</h4>
+                          <div className="space-y-1">
+                            {fileAtts.map((att, idx) => {
+                              const dlUrl = att.driveDownloadUrl || att.url;
+                              return (
+                                <a
+                                  key={att.id || idx}
+                                  href={dlUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-2 p-2 rounded-md border hover-elevate"
+                                  data-testid={`link-attachment-${idx}`}
+                                >
+                                  <FileIcon className="w-4 h-4 text-muted-foreground shrink-0" />
+                                  <span className="text-sm truncate">{att.name}</span>
+                                  <Download className="w-3.5 h-3.5 ml-auto text-muted-foreground shrink-0" />
+                                </a>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {selectedCard.approvalNotes && (
                   <div className="rounded-md border p-3 bg-muted/30">

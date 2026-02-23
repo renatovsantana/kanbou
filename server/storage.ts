@@ -116,6 +116,7 @@ export interface IStorage {
   markAllNotificationsRead(role: string, clientId?: number): Promise<void>;
   markInsightNotificationsRead(role: string, clientId?: number): Promise<void>;
   markKanbanNotificationsRead(role: string, clientId?: number): Promise<void>;
+  markCardNotificationsRead(kanbanCardId: number, role: string, clientId?: number): Promise<void>;
 
   getCompetitors(): Promise<Competitor[]>;
   getCompetitorsByClient(clientId: number): Promise<Competitor[]>;
@@ -469,6 +470,30 @@ export class DatabaseStorage implements IStorage {
     const conditions = [
       eq(notifications.type, "insight"),
       eq(notifications.isRead, false),
+    ];
+    if (role === "client" && clientId) {
+      conditions.push(eq(notifications.recipientRole, "client"));
+      conditions.push(eq(notifications.clientId, clientId));
+    } else if (role === "client") {
+      conditions.push(eq(notifications.recipientRole, "client"));
+    } else {
+      conditions.push(
+        or(
+          eq(notifications.recipientRole, "admin"),
+          eq(notifications.recipientRole, "designer"),
+          eq(notifications.recipientRole, "all"),
+        )!
+      );
+    }
+    await db.update(notifications)
+      .set({ isRead: true })
+      .where(and(...conditions));
+  }
+
+  async markCardNotificationsRead(kanbanCardId: number, role: string, clientId?: number): Promise<void> {
+    const conditions = [
+      eq(notifications.isRead, false),
+      eq(notifications.kanbanCardId, kanbanCardId),
     ];
     if (role === "client" && clientId) {
       conditions.push(eq(notifications.recipientRole, "client"));

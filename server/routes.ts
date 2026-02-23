@@ -1057,6 +1057,15 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
+  app.put("/api/notifications/read-by-card/:cardId", requireAuth, async (req, res) => {
+    const user = await getCurrentUser(req);
+    if (!user) return res.status(401).json({ message: "Não autenticado" });
+    const cardId = Number(req.params.cardId);
+    if (isNaN(cardId)) return res.status(400).json({ message: "ID inválido" });
+    await storage.markCardNotificationsRead(cardId, user.role, user.clientId ?? undefined);
+    res.json({ success: true });
+  });
+
   // === COMPETITORS ===
 
   app.get("/api/competitors", requireAuth, async (req, res) => {
@@ -2411,6 +2420,7 @@ export async function registerRoutes(
 
     await storage.createNotification({
       clientId: card.clientId,
+      kanbanCardId: card.id,
       type: "approval_sent",
       message: `"${card.title}" enviado para sua aprovação por ${user?.name || "Designer"}`,
       recipientRole: "client",
@@ -2671,6 +2681,7 @@ export async function registerRoutes(
     const undoRecipient = user.role === "client" ? "admin" : "client";
     await storage.createNotification({
       clientId: card.clientId,
+      kanbanCardId: card.id,
       type: "approval_sent",
       message: `"${card.title}" - decisão desfeita por ${user.name || "Usuário"}, voltou para aprovação`,
       recipientRole: undoRecipient,
