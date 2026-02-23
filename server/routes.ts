@@ -1985,17 +1985,29 @@ export async function registerRoutes(
       columns = await storage.getKanbanColumnsByClient(clientId);
     } else {
       const existingTitles = columns.map(c => c.title);
-      const maxPos = Math.max(...columns.map(c => c.position));
-      let nextPos = maxPos + 1;
       let added = false;
-      for (const requiredCol of PROTECTED_KANBAN_COLUMNS) {
+      for (const requiredCol of DEFAULT_KANBAN_COLUMNS) {
         if (!existingTitles.includes(requiredCol)) {
-          await storage.createKanbanColumn({
+          const defaultIdx = DEFAULT_KANBAN_COLUMNS.indexOf(requiredCol);
+          let insertPos = defaultIdx;
+          const prevDefault = DEFAULT_KANBAN_COLUMNS.slice(0, defaultIdx).reverse().find(t => existingTitles.includes(t));
+          if (prevDefault) {
+            const prevCol = columns.find(c => c.title === prevDefault);
+            if (prevCol) insertPos = prevCol.position + 1;
+          }
+          const colsToShift = columns.filter(c => c.position >= insertPos);
+          for (const col of colsToShift) {
+            await storage.updateKanbanColumn(col.id, { position: col.position + 1 });
+            col.position += 1;
+          }
+          const newCol = await storage.createKanbanColumn({
             clientId,
             title: requiredCol,
-            position: nextPos++,
+            position: insertPos,
             isDefault: true,
           });
+          columns.push(newCol);
+          existingTitles.push(requiredCol);
           added = true;
         }
       }

@@ -277,6 +277,8 @@ export const kanbanTimeEntries = pgTable("kanban_time_entries", {
 export const DEFAULT_KANBAN_COLUMNS = [
   "Fila",
   "Desenvolvendo Design",
+  "Revisar Criação",
+  "Finalizado Copy",
   "Desenvolvendo Copy",
   "Em Aprovação",
   "Tráfego e RDS",
@@ -294,6 +296,7 @@ export const MANDATORY_FIRST_COLUMN = "Fila";
 export const TIMED_COLUMNS = [
   "Fila",
   "Desenvolvendo Design",
+  "Revisar Criação",
   "Desenvolvendo Copy",
 ];
 
