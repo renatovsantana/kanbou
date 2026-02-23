@@ -187,6 +187,43 @@ export async function exportBriefingPdf(briefing: Briefing, templates?: Briefing
   }, 500);
 }
 
+function generateAnswerHtml(answer: any, questionType?: string): string {
+  if (questionType === "color-picker" && Array.isArray(answer)) {
+    let h = "";
+    for (const c of answer) {
+      if (c) h += `<span class="color-swatch" style="background:${c}"></span><span style="font-size:12px;margin-right:16px;">${c}</span>`;
+    }
+    return h;
+  }
+  if (questionType === "image-upload" && Array.isArray(answer)) {
+    let h = `<div class="ref-images">`;
+    for (const url of answer) {
+      h += `<img src="${window.location.origin}${url}" />`;
+    }
+    h += `</div>`;
+    return h;
+  }
+  if (typeof answer === "object" && answer !== null && answer.fileUrl) {
+    return `<a href="${window.location.origin}${answer.fileUrl}" target="_blank">${answer.fileName || "Arquivo anexado"}</a>`;
+  }
+  if (Array.isArray(answer)) {
+    if (answer.every((c: any) => typeof c === "string" && c.startsWith("#"))) {
+      let h = "";
+      for (const c of answer) {
+        if (c) h += `<span class="color-swatch" style="background:${c}"></span><span style="font-size:12px;margin-right:16px;">${c}</span>`;
+      }
+      return h;
+    }
+    let h = `<div class="badge-list">`;
+    for (const a of answer) {
+      h += `<span class="badge">${a}</span>`;
+    }
+    h += `</div>`;
+    return h;
+  }
+  return String(answer);
+}
+
 function generateCustomPdfContent(briefing: Briefing, answers: Record<string, any>, questions: BriefingTemplateQuestion[]): string {
   let html = `
     <html><head><meta charset="utf-8">
@@ -197,7 +234,11 @@ function generateCustomPdfContent(briefing: Briefing, answers: Record<string, an
       .question { margin: 16px 0; padding: 12px 0; border-bottom: 1px solid #e5e7eb; }
       .question-label { font-size: 12px; color: #6b7280; font-weight: 600; margin-bottom: 6px; text-transform: uppercase; }
       .answer { font-size: 14px; line-height: 1.6; }
+      .badge-list { display: flex; flex-wrap: wrap; gap: 6px; }
+      .badge { display: inline-block; padding: 3px 10px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; font-size: 12px; color: #166534; }
       .color-swatch { display: inline-block; width: 28px; height: 28px; border-radius: 6px; border: 2px solid #e5e7eb; margin-right: 8px; vertical-align: middle; }
+      .ref-images { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+      .ref-images img { max-width: 180px; max-height: 140px; border-radius: 6px; border: 1px solid #e5e7eb; object-fit: cover; }
       @media print { body { padding: 20px; } }
     </style>
     </head><body>
@@ -205,39 +246,19 @@ function generateCustomPdfContent(briefing: Briefing, answers: Record<string, an
     <div class="subtitle">Cliente: ${briefing.clientName} &mdash; Respondido em ${briefing.completedAt ? new Date(briefing.completedAt).toLocaleDateString("pt-BR") : new Date().toLocaleDateString("pt-BR")}</div>
   `;
 
-  for (const q of questions) {
-    const answer = answers[q.id];
-    if (!answer || (Array.isArray(answer) && answer.length === 0)) continue;
-
-    html += `<div class="question"><div class="question-label">${q.text}</div><div class="answer">`;
-
-    if (q.type === "color-picker" && Array.isArray(answer)) {
-      for (const c of answer) {
-        if (c) html += `<span class="color-swatch" style="background:${c}"></span><span style="font-size:12px;margin-right:16px;">${c}</span>`;
-      }
-    } else if (typeof answer === "object" && answer !== null && answer.fileUrl) {
-      html += `<a href="${window.location.origin}${answer.fileUrl}" target="_blank">${answer.fileName || "Arquivo anexado"}</a>`;
-    } else {
-      html += String(answer);
-    }
-
-    html += `</div></div>`;
-  }
-
-  if (questions.length === 0) {
-    const entries = Object.entries(answers);
-    for (const [key, answer] of entries) {
+  if (questions.length > 0) {
+    for (const q of questions) {
+      const answer = answers[q.id];
       if (!answer || (Array.isArray(answer) && answer.length === 0)) continue;
-      html += `<div class="question"><div class="question-label">Pergunta</div><div class="answer">`;
-      if (Array.isArray(answer)) {
-        for (const c of answer) {
-          if (c) html += `<span class="color-swatch" style="background:${c}"></span><span style="font-size:12px;margin-right:16px;">${c}</span>`;
-        }
-      } else if (typeof answer === "object" && answer !== null && answer.fileUrl) {
-        html += `<a href="${window.location.origin}${answer.fileUrl}" target="_blank">${answer.fileName || "Arquivo anexado"}</a>`;
-      } else {
-        html += String(answer);
-      }
+      html += `<div class="question"><div class="question-label">${q.text}</div><div class="answer">`;
+      html += generateAnswerHtml(answer, q.type);
+      html += `</div></div>`;
+    }
+  } else {
+    for (const [, answer] of Object.entries(answers)) {
+      if (!answer || (Array.isArray(answer) && (answer as any[]).length === 0)) continue;
+      html += `<div class="question"><div class="question-label">Resposta</div><div class="answer">`;
+      html += generateAnswerHtml(answer);
       html += `</div></div>`;
     }
   }
@@ -439,6 +460,7 @@ export default function BriefingsPage() {
         const entries = Object.entries(answers);
         return (
           <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+            <p className="text-sm text-muted-foreground italic">Template não encontrado. Exibindo respostas brutas:</p>
             {entries.map(([key, answer]) => {
               if (!answer || (Array.isArray(answer) && answer.length === 0)) return null;
               return (
@@ -462,23 +484,7 @@ export default function BriefingsPage() {
                 <p className="text-xs font-medium text-muted-foreground mb-1">
                   {String(idx + 1).padStart(2, '0')}. {q.text}
                 </p>
-                {q.type === "color-picker" && Array.isArray(answer) ? (
-                  <div className="flex items-center gap-3 mt-1">
-                    {answer.map((c: string, i: number) => c ? (
-                      <div key={i} className="flex items-center gap-1.5">
-                        <div className="w-6 h-6 rounded-md border" style={{ backgroundColor: c }} />
-                        <span className="text-xs text-muted-foreground">{c}</span>
-                      </div>
-                    ) : null)}
-                  </div>
-                ) : typeof answer === "object" && answer !== null && answer.fileUrl ? (
-                  <a href={answer.fileUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary underline flex items-center gap-1.5">
-                    <FileText className="w-3.5 h-3.5" />
-                    {answer.fileName || "Arquivo anexado"}
-                  </a>
-                ) : (
-                  <p className="text-sm">{String(answer)}</p>
-                )}
+                {renderAnswerValue(answer, { id: q.id, text: q.text, type: q.type as any })}
               </div>
             );
           })}
