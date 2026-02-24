@@ -176,7 +176,7 @@ export default function SettingsPage() {
       name: "Criativo",
       description: "Laranja vibrante, ousado e moderno",
       icon: Sparkles,
-      colors: ["hsl(18 82% 48%)", "hsl(16 30% 12%)", "hsl(30 15% 96%)"],
+      colors: ["hsl(18 82% 48%)", "hsl(195 84% 9%)", "hsl(30 15% 96%)"],
     },
   ];
 

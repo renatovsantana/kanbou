@@ -184,31 +184,31 @@
   --input: 20 12% 88%;
   --ring: 18 82% 48%;
 
-  --sidebar-bg: 16 30% 12%;
-  --sidebar-fg: 20 12% 93%;
-  --sidebar-muted: 16 24% 18%;
+  --sidebar-bg: 195 84% 9%;
+  --sidebar-fg: 195 15% 93%;
+  --sidebar-muted: 195 50% 14%;
   --sidebar-accent: 18 82% 53%;
-  --sidebar-border: 16 24% 18%;
+  --sidebar-border: 195 50% 14%;
 }
 
 [data-theme="creative"].dark {
-  --background: 20 22% 9%;
-  --foreground: 30 12% 93%;
+  --background: 195 60% 6%;
+  --foreground: 195 12% 93%;
 
-  --card: 20 20% 12%;
-  --card-foreground: 30 12% 93%;
+  --card: 195 50% 10%;
+  --card-foreground: 195 12% 93%;
 
-  --popover: 20 20% 12%;
-  --popover-foreground: 30 12% 93%;
+  --popover: 195 50% 10%;
+  --popover-foreground: 195 12% 93%;
 
   --primary: 18 82% 53%;
   --primary-foreground: 0 0% 100%;
 
-  --secondary: 16 16% 17%;
-  --secondary-foreground: 20 12% 80%;
+  --secondary: 195 30% 14%;
+  --secondary-foreground: 195 12% 80%;
 
-  --muted: 16 14% 15%;
-  --muted-foreground: 16 8% 55%;
+  --muted: 195 25% 12%;
+  --muted-foreground: 195 10% 55%;
 
   --accent: 28 85% 52%;
   --accent-foreground: 0 0% 100%;
@@ -216,15 +216,15 @@
   --destructive: 0 62% 50%;
   --destructive-foreground: 0 0% 100%;
 
-  --border: 16 16% 17%;
-  --input: 16 16% 17%;
+  --border: 195 30% 14%;
+  --input: 195 30% 14%;
   --ring: 18 82% 53%;
 
-  --sidebar-bg: 16 28% 7%;
-  --sidebar-fg: 20 12% 93%;
-  --sidebar-muted: 16 20% 13%;
+  --sidebar-bg: 195 84% 6%;
+  --sidebar-fg: 195 15% 93%;
+  --sidebar-muted: 195 45% 11%;
   --sidebar-accent: 18 82% 53%;
-  --sidebar-border: 16 20% 13%;
+  --sidebar-border: 195 45% 11%;
 }
 
 /* Override kanban backgrounds per theme */
@@ -235,10 +235,10 @@
   background: linear-gradient(135deg, hsl(220 22% 10%) 0%, hsl(222 20% 7%) 50%, hsl(224 18% 5%) 100%);
 }
 [data-theme="creative"] .kanban-board-bg {
-  background: linear-gradient(135deg, hsl(18 30% 18%) 0%, hsl(14 25% 14%) 50%, hsl(10 20% 12%) 100%);
+  background: linear-gradient(135deg, hsl(195 50% 14%) 0%, hsl(195 60% 11%) 50%, hsl(195 84% 9%) 100%);
 }
 [data-theme="creative"].dark .kanban-board-bg {
-  background: linear-gradient(135deg, hsl(18 25% 10%) 0%, hsl(14 20% 8%) 50%, hsl(10 18% 6%) 100%);
+  background: linear-gradient(135deg, hsl(195 45% 10%) 0%, hsl(195 55% 7%) 50%, hsl(195 70% 5%) 100%);
 }
 
 @layer base {
