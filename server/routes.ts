@@ -72,12 +72,12 @@ function clearLoginAttempts(ip: string) {
   loginAttempts.delete(ip);
 }
 
-async function generateThumbnail(buffer: Buffer, attachmentId: string, width = 300, height = 300): Promise<string | null> {
+async function generateThumbnail(buffer: Buffer, attachmentId: string, width = 300, height = 300, quality = 60): Promise<string | null> {
   try {
     const thumbPath = path.join(THUMBNAILS_DIR, `${attachmentId}.webp`);
     await sharp(buffer)
       .resize(width, height, { fit: "inside", withoutEnlargement: true })
-      .webp({ quality: 75 })
+      .webp({ quality })
       .toFile(thumbPath);
     return `/api/thumbnails/${attachmentId}.webp`;
   } catch (err) {
@@ -3309,7 +3309,7 @@ export async function registerRoutes(
       const attachmentId = randomUUID();
       const thumbnailUrl = await generateThumbnail(file.buffer, attachmentId);
       const coverThumbId = `cover-${attachmentId}`;
-      const coverThumbUrl = await generateThumbnail(file.buffer, coverThumbId, 800, 400);
+      const coverThumbUrl = await generateThumbnail(file.buffer, coverThumbId, 400, 200, 55);
 
       let attachments: any[] = [];
       if (card.attachments) {
@@ -3336,7 +3336,7 @@ export async function registerRoutes(
 
       const updated = await storage.updateKanbanCard(cardId, {
         attachments: JSON.stringify(attachments),
-        coverUrl: coverThumbUrl || thumbnailUrl || driveResult.downloadUrl,
+        coverUrl: coverThumbUrl || thumbnailUrl,
       });
 
       res.json(updated);
