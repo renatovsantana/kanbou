@@ -174,9 +174,9 @@ export default function SettingsPage() {
     {
       id: "creative" as const,
       name: "Criativo",
-      description: "Roxo vibrante, ousado e moderno",
+      description: "Laranja vibrante, ousado e moderno",
       icon: Sparkles,
-      colors: ["hsl(262 72% 55%)", "hsl(258 30% 12%)", "hsl(250 15% 96%)"],
+      colors: ["hsl(18 82% 48%)", "hsl(16 30% 12%)", "hsl(30 15% 96%)"],
     },
   ];
 
