@@ -954,19 +954,25 @@ export default function KanbanBoard() {
   const { data: columns = [], isLoading: loadingColumns } = useQuery<KanbanColumn[]>({
     queryKey: ["/api/kanban", clientId, "columns"],
     enabled: !!clientId,
-    refetchInterval: 15000,
+    staleTime: 0,
+    refetchInterval: 10000,
+    refetchOnWindowFocus: true,
   });
 
   const { data: cards = [], isLoading: loadingCards } = useQuery<KanbanCard[]>({
     queryKey: ["/api/kanban", clientId, "cards"],
     enabled: !!clientId,
-    refetchInterval: 15000,
+    staleTime: 0,
+    refetchInterval: 10000,
+    refetchOnWindowFocus: true,
   });
 
   const { data: columnTimesData } = useQuery<Record<number, { accumulatedSeconds: number; openSince: string | null }>>({
     queryKey: ["/api/kanban/client", clientId, "column-times"],
     enabled: !!clientId,
-    refetchInterval: 60000,
+    staleTime: 0,
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
   });
 
   const sortedColumns = useMemo(
