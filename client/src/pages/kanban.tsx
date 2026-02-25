@@ -1025,9 +1025,11 @@ export default function KanbanBoard() {
       });
       return { previousCards };
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/kanban", clientId, "cards"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/kanban/client", clientId, "column-times"] });
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: ["/api/kanban", clientId, "cards"] }),
+        queryClient.refetchQueries({ queryKey: ["/api/kanban/client", clientId, "column-times"] }),
+      ]);
     },
     onError: (error: any, _vars, context) => {
       if (context?.previousCards) {

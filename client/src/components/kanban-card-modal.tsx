@@ -259,6 +259,7 @@ export function KanbanCardModal({ cardId, clientId, open, onClose, columnTitle }
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/kanban/cards", cardId] });
       queryClient.invalidateQueries({ queryKey: ["/api/kanban", clientId, "cards"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/kanban/client", clientId, "column-times"] });
       setShowScheduleConfirm(false);
       toast({ title: "Post movido para 'Agendados' com sucesso" });
       onClose();
@@ -317,6 +318,7 @@ export function KanbanCardModal({ cardId, clientId, open, onClose, columnTitle }
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/kanban/cards", cardId] });
       queryClient.invalidateQueries({ queryKey: ["/api/kanban", clientId, "cards"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/kanban/client", clientId, "column-times"] });
       toast({ title: "Enviado para aprovação do cliente" });
     },
     onError: () => {
@@ -331,6 +333,7 @@ export function KanbanCardModal({ cardId, clientId, open, onClose, columnTitle }
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/kanban/cards", cardId] });
       queryClient.invalidateQueries({ queryKey: ["/api/kanban", clientId, "cards"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/kanban/client", clientId, "column-times"] });
       setApprovalNotes("");
       toast({ title: "Material aprovado!" });
     },
@@ -346,6 +349,7 @@ export function KanbanCardModal({ cardId, clientId, open, onClose, columnTitle }
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/kanban/cards", cardId] });
       queryClient.invalidateQueries({ queryKey: ["/api/kanban", clientId, "cards"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/kanban/client", clientId, "column-times"] });
       setApprovalNotes("");
       toast({ title: "Material reprovado" });
     },
@@ -361,6 +365,7 @@ export function KanbanCardModal({ cardId, clientId, open, onClose, columnTitle }
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/kanban/cards", cardId] });
       queryClient.invalidateQueries({ queryKey: ["/api/kanban", clientId, "cards"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/kanban/client", clientId, "column-times"] });
       setApprovalNotes("");
       toast({ title: "Revisão solicitada" });
     },
@@ -376,6 +381,7 @@ export function KanbanCardModal({ cardId, clientId, open, onClose, columnTitle }
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/kanban/cards", cardId] });
       queryClient.invalidateQueries({ queryKey: ["/api/kanban", clientId, "cards"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/kanban/client", clientId, "column-times"] });
       toast({ title: "Decisão desfeita, cartão voltou para aprovação" });
     },
     onError: () => {
