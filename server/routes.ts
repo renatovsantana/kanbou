@@ -3320,6 +3320,173 @@ export async function registerRoutes(
     }
   });
 
+  // === AI AGENT ROUTES ===
+
+  async function checkAiClientAccess(user: any, clientId: number): Promise<boolean> {
+    if (user.role === "admin") return true;
+    if (user.role === "client") return user.clientId === clientId;
+    const access = await storage.getUserClientAccess(user.id);
+    if (access.length === 0) return true;
+    return access.some(a => a.clientId === clientId);
+  }
+
+  function resolveAiClientId(req: any, user: any): number | null {
+    if (user.role === "client" && user.clientId) return user.clientId;
+    const raw = req.body?.clientId;
+    return typeof raw === "number" && Number.isFinite(raw) ? raw : null;
+  }
+
+  app.post("/api/ai/client-overview", requireAuth, async (req, res) => {
+    try {
+      const user = await getCurrentUser(req);
+      if (!user) return res.status(401).json({ message: "Não autenticado" });
+      const clientId = resolveAiClientId(req, user);
+      if (!clientId) return res.status(400).json({ message: "clientId é obrigatório" });
+      if (!(await checkAiClientAccess(user, clientId))) return res.status(403).json({ message: "Sem permissão para este cliente" });
+      const { clientOverview } = await import("./ai-agent");
+      const result = await clientOverview(clientId, storage);
+      res.json({ result });
+    } catch (err: any) {
+      console.error("AI client-overview error:", err);
+      res.status(500).json({ message: "Erro ao gerar overview" });
+    }
+  });
+
+  app.post("/api/ai/analyze-competitors", requireAuth, async (req, res) => {
+    try {
+      const user = await getCurrentUser(req);
+      if (!user) return res.status(401).json({ message: "Não autenticado" });
+      const clientId = resolveAiClientId(req, user);
+      if (!clientId) return res.status(400).json({ message: "clientId é obrigatório" });
+      if (!(await checkAiClientAccess(user, clientId))) return res.status(403).json({ message: "Sem permissão para este cliente" });
+      const { analyzeCompetitors } = await import("./ai-agent");
+      const result = await analyzeCompetitors(clientId, storage);
+      res.json({ result });
+    } catch (err: any) {
+      console.error("AI analyze-competitors error:", err);
+      res.status(500).json({ message: "Erro ao analisar concorrentes" });
+    }
+  });
+
+  app.post("/api/ai/suggest-content", requireAuth, async (req, res) => {
+    try {
+      const user = await getCurrentUser(req);
+      if (!user) return res.status(401).json({ message: "Não autenticado" });
+      const clientId = resolveAiClientId(req, user);
+      if (!clientId) return res.status(400).json({ message: "clientId é obrigatório" });
+      if (!(await checkAiClientAccess(user, clientId))) return res.status(403).json({ message: "Sem permissão para este cliente" });
+      const quantity = typeof req.body?.quantity === "number" ? Math.min(Math.max(req.body.quantity, 1), 20) : undefined;
+      const platform = typeof req.body?.platform === "string" ? req.body.platform.slice(0, 50) : undefined;
+      const focus = typeof req.body?.focus === "string" ? req.body.focus.slice(0, 200) : undefined;
+      const { suggestContent } = await import("./ai-agent");
+      const result = await suggestContent(clientId, storage, { platform, quantity, focus });
+      res.json({ result });
+    } catch (err: any) {
+      console.error("AI suggest-content error:", err);
+      res.status(500).json({ message: "Erro ao sugerir conteúdo" });
+    }
+  });
+
+  app.post("/api/ai/generate-insight", requireAuth, async (req, res) => {
+    try {
+      const user = await getCurrentUser(req);
+      if (!user) return res.status(401).json({ message: "Não autenticado" });
+      const clientId = resolveAiClientId(req, user);
+      if (!clientId) return res.status(400).json({ message: "clientId é obrigatório" });
+      if (!(await checkAiClientAccess(user, clientId))) return res.status(403).json({ message: "Sem permissão para este cliente" });
+      const focus = typeof req.body?.focus === "string" ? req.body.focus.slice(0, 200) : undefined;
+      const { generateInsight } = await import("./ai-agent");
+      const result = await generateInsight(clientId, storage, focus);
+      if (!result.startsWith("⚠️") && !result.startsWith("Cliente não")) {
+        await storage.createClientInsight({
+          clientId,
+          userId: user.id,
+          message: result,
+        });
+        const client = await storage.getClient(clientId);
+        if (client) {
+          const isInternal = user.role === "admin" || user.role === "designer";
+          await storage.createNotification({
+            title: "Novo Insight (IA)",
+            message: `Insight gerado por IA para ${client.name}`,
+            type: "insight",
+            recipientRole: isInternal ? "client" : "admin",
+            recipientUserId: null,
+            relatedClientId: clientId,
+          });
+        }
+      }
+      res.json({ result });
+    } catch (err: any) {
+      console.error("AI generate-insight error:", err);
+      res.status(500).json({ message: "Erro ao gerar insight" });
+    }
+  });
+
+  app.post("/api/ai/weekly-report", requireAuth, async (req, res) => {
+    try {
+      const user = await getCurrentUser(req);
+      if (!user) return res.status(401).json({ message: "Não autenticado" });
+      const clientId = resolveAiClientId(req, user);
+      if (!clientId) return res.status(400).json({ message: "clientId é obrigatório" });
+      if (!(await checkAiClientAccess(user, clientId))) return res.status(403).json({ message: "Sem permissão para este cliente" });
+      const { weeklyReport } = await import("./ai-agent");
+      const result = await weeklyReport(clientId, storage);
+      res.json({ result });
+    } catch (err: any) {
+      console.error("AI weekly-report error:", err);
+      res.status(500).json({ message: "Erro ao gerar relatório semanal" });
+    }
+  });
+
+  app.post("/api/ai/activity-report", requireAuth, async (req, res) => {
+    try {
+      const user = await getCurrentUser(req);
+      if (!user) return res.status(401).json({ message: "Não autenticado" });
+      const clientId = resolveAiClientId(req, user);
+      if (!clientId) return res.status(400).json({ message: "clientId é obrigatório" });
+      if (!(await checkAiClientAccess(user, clientId))) return res.status(403).json({ message: "Sem permissão para este cliente" });
+      const validPeriods = ["7d", "15d", "30d"];
+      const period = validPeriods.includes(req.body?.period) ? req.body.period : "7d";
+      const { activityReport } = await import("./ai-agent");
+      const result = await activityReport(clientId, storage, period);
+      res.json({ result });
+    } catch (err: any) {
+      console.error("AI activity-report error:", err);
+      res.status(500).json({ message: "Erro ao gerar relatório de acontecimentos" });
+    }
+  });
+
+  app.post("/api/ai/analyze-productivity", requireAuth, async (req, res) => {
+    try {
+      const user = await getCurrentUser(req);
+      if (!user) return res.status(401).json({ message: "Não autenticado" });
+      if (!isInternalRole(user.role)) return res.status(403).json({ message: "Acesso negado" });
+      const clientId = resolveAiClientId(req, user);
+      if (clientId && !(await checkAiClientAccess(user, clientId))) return res.status(403).json({ message: "Sem permissão para este cliente" });
+      const { analyzeProductivity } = await import("./ai-agent");
+      const result = await analyzeProductivity(clientId, storage);
+      res.json({ result });
+    } catch (err: any) {
+      console.error("AI analyze-productivity error:", err);
+      res.status(500).json({ message: "Erro ao analisar produtividade" });
+    }
+  });
+
+  app.post("/api/ai/analyze-errors", requireAuth, async (req, res) => {
+    try {
+      const user = await getCurrentUser(req);
+      if (!user) return res.status(401).json({ message: "Não autenticado" });
+      if (user.role !== "admin") return res.status(403).json({ message: "Acesso negado" });
+      const { analyzeErrors } = await import("./ai-agent");
+      const result = await analyzeErrors(storage);
+      res.json({ result });
+    } catch (err: any) {
+      console.error("AI analyze-errors error:", err);
+      res.status(500).json({ message: "Erro ao analisar erros" });
+    }
+  });
+
   // === CLIENT ONBOARDING ROUTES ===
 
   /**

@@ -37,6 +37,7 @@ import {
   Lightbulb,
   CalendarCheck,
   Book,
+  Sparkles,
 } from "lucide-react";
 import { useState, useMemo, useEffect, useRef, useCallback, createContext, useContext } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -54,6 +55,7 @@ import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Client, Notification } from "@shared/schema";
+import { AIAssistantPanel } from "@/components/ai-assistant-panel";
 import { isInternalRole } from "@shared/schema";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -347,6 +349,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
 
   const [errorReportOpen, setErrorReportOpen] = useState(false);
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
 
   const dashboardNav = [
     { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -644,6 +647,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </div>
 
       <div className="p-4 mt-auto space-y-3">
+        <button
+          onClick={() => { setAiPanelOpen(true); setIsMobileMenuOpen(false); }}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm cursor-pointer transition-colors"
+          style={{ background: 'hsl(var(--sidebar-accent) / 0.15)', color: 'hsl(var(--sidebar-accent))' }}
+          data-testid="button-ai-sidebar"
+        >
+          <Sparkles className="w-4 h-4" />
+          <span className="font-medium">Assistente IA</span>
+        </button>
         <Link href="/documentacao" onClick={() => setIsMobileMenuOpen(false)}>
           <div
             className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm cursor-pointer transition-colors ${
@@ -754,6 +766,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <Button
               variant="ghost"
               size="icon"
+              onClick={() => setAiPanelOpen(true)}
+              data-testid="button-ai-mobile"
+              style={{ color: 'hsl(var(--sidebar-fg) / 0.7)' }}
+            >
+              <Sparkles className="w-5 h-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setErrorReportOpen(true)}
               data-testid="button-error-report-mobile"
               style={{ color: 'hsl(var(--sidebar-fg) / 0.7)' }}
@@ -772,6 +793,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
         <div className={`flex-1 min-h-screen pt-14 lg:pt-0 flex flex-col transition-all duration-300 overflow-x-hidden ${sidebarCollapsed ? "lg:ml-0" : "lg:ml-64"}`}>
           <header className="hidden lg:flex items-center justify-end gap-1 px-4 h-12 border-b bg-card/50 sticky top-0 z-[9999]">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setAiPanelOpen(true)}
+              data-testid="button-ai-header"
+              title="Assistente IA"
+            >
+              <Sparkles className="w-4 h-4" />
+            </Button>
             <Button
               variant="ghost"
               size="icon"
@@ -804,6 +834,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
           open={errorReportOpen}
           onOpenChange={setErrorReportOpen}
           currentRoute={location}
+        />
+
+        <AIAssistantPanel
+          open={aiPanelOpen}
+          onOpenChange={setAiPanelOpen}
         />
       </div>
     </SidebarContext.Provider>
