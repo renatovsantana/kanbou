@@ -1022,29 +1022,41 @@ export async function registerRoutes(
     }
   });
 
-  /** GET /api/kanban/scheduled-cards - Returns kanban cards in scheduled/posted columns with publish dates, excluding already-imported ones. Requires auth. */
+  /** GET /api/kanban/scheduled-cards - Returns all kanban cards with dates (publishDate/deadline) for calendar view. Requires auth. */
   app.get("/api/kanban/scheduled-cards", requireAuth, async (req, res) => {
     try {
       const user = await getCurrentUser(req);
       if (!user) return res.status(401).json({ message: "Não autenticado" });
 
-      const scheduledData = await storage.getScheduledKanbanCards();
+      const calendarData = await storage.getCalendarKanbanCards();
 
-      let filtered = scheduledData;
+      let filtered = calendarData;
       if (user.role === "client" && user.clientId) {
-        filtered = scheduledData.filter(d => d.card.clientId === user.clientId);
+        filtered = calendarData.filter(d => d.card.clientId === user.clientId);
       }
 
       const allClients = await storage.getClients();
       const clientMap = new Map(allClients.map(c => [c.id, c.name]));
 
-      const allPosts = await storage.getPosts();
-      const postKanbanIds = new Set(allPosts.filter(p => p.kanbanCardId).map(p => p.kanbanCardId));
+      const COLUMN_STATUS_MAP: Record<string, string> = {
+        "Fila": "Na Fila",
+        "Desenvolvendo Design": "Em Produção",
+        "Revisar Criação": "Em Produção",
+        "Finalizado Copy": "Em Produção",
+        "Desenvolvendo Copy": "Em Produção",
+        "Em Aprovação": "Em Aprovação",
+        "Tráfego e RDS": "Em Aprovação",
+        "Revisão": "Revisão",
+        "Aprovados": "Aprovado",
+        "Reprovados": "Reprovado",
+        "Agendamento": "Aguardando Agendar",
+        "Agendados": "Agendado",
+        "Postados": "Postado",
+        "Finalizados": "Finalizado",
+      };
 
       const result: any[] = [];
       for (const { card, columnTitle } of filtered) {
-        if (postKanbanIds.has(card.id)) continue;
-
         let templateObj: Record<string, string> = {};
         try { if (card.templateData) templateObj = JSON.parse(card.templateData as string); } catch {}
 
@@ -1052,8 +1064,7 @@ export async function registerRoutes(
         if (!scheduledDate) continue;
 
         const platforms = parsePlatform(templateObj.platform);
-
-        const status = columnTitle === "Postados" ? "Postado" : "Agendado";
+        const status = COLUMN_STATUS_MAP[columnTitle] || columnTitle;
 
         result.push({
           id: `kanban-${card.id}`,
@@ -1064,7 +1075,9 @@ export async function registerRoutes(
           content: templateObj.caption || card.description || "",
           platform: platforms,
           scheduledDate,
+          scheduledTime: templateObj.publishTime || null,
           status,
+          columnTitle,
           cardType: card.cardType,
           source: "kanban" as const,
         });
@@ -1072,8 +1085,8 @@ export async function registerRoutes(
 
       res.json(result);
     } catch (err) {
-      console.error("Error getting scheduled kanban cards:", err);
-      res.status(500).json({ message: "Erro ao buscar cards agendados" });
+      console.error("Error getting calendar kanban cards:", err);
+      res.status(500).json({ message: "Erro ao buscar cards do calendário" });
     }
   });
 

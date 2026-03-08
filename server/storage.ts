@@ -78,7 +78,7 @@ import {
   type InsertErrorReport,
   type SystemSetting,
 } from "@shared/schema";
-import { eq, desc, and, or, asc, isNull, gte, lte, sql, arrayContains, inArray } from "drizzle-orm";
+import { eq, desc, and, or, asc, isNull, isNotNull, gte, lte, sql, arrayContains, inArray } from "drizzle-orm";
 
 /**
  * Interface de armazenamento que define todos os métodos CRUD da aplicação.
@@ -235,6 +235,8 @@ export interface IStorage {
   getApprovedKanbanCards(): Promise<KanbanCard[]>;
   /** Lista cards nas colunas "Agendados" ou "Postados" com o título da coluna */
   getScheduledKanbanCards(): Promise<{ card: KanbanCard; columnTitle: string }[]>;
+  /** Lista todos os cards com datas (publishDate/deadline) no templateData, com título da coluna */
+  getCalendarKanbanCards(): Promise<{ card: KanbanCard; columnTitle: string }[]>;
   /** Lista atividades (histórico de movimentações) de um card */
   getKanbanActivity(cardId: number): Promise<KanbanActivity[]>;
   /** Registra uma nova atividade de movimentação no kanban */
@@ -891,6 +893,25 @@ export class DatabaseStorage implements IStorage {
       card,
       columnTitle: columnMap.get(card.columnId) || "",
     }));
+  }
+
+  /** @inheritdoc */
+  async getCalendarKanbanCards(): Promise<{ card: KanbanCard; columnTitle: string }[]> {
+    const allColumns = await db.select().from(kanbanColumns);
+    const columnMap = new Map(allColumns.map(c => [c.id, c.title]));
+    const cards = await db.select().from(kanbanCards)
+      .where(isNotNull(kanbanCards.templateData));
+    return cards
+      .filter(card => {
+        try {
+          const data = JSON.parse(card.templateData as string);
+          return data.publishDate || data.deadline;
+        } catch { return false; }
+      })
+      .map(card => ({
+        card,
+        columnTitle: columnMap.get(card.columnId) || "",
+      }));
   }
 
   /** @inheritdoc */
