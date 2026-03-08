@@ -966,6 +966,42 @@ function KanbanScrollArea({ children, client }: { children: React.ReactNode; cli
     bgStyle.background = client.kanbanBgColor;
   }
 
+  const bottomBarRef = useRef<HTMLDivElement>(null);
+  const bottomInnerRef = useRef<HTMLDivElement>(null);
+  const isBottomScrolling = useRef(false);
+
+  const handleBottomScroll = useCallback(() => {
+    if (isBottomScrolling.current) return;
+    const bottom = bottomBarRef.current;
+    const main = mainRef.current;
+    if (!bottom || !main) return;
+    isScrolling.current = true;
+    main.scrollLeft = bottom.scrollLeft;
+    if (topBarRef.current) topBarRef.current.scrollLeft = bottom.scrollLeft;
+    requestAnimationFrame(() => { isScrolling.current = false; });
+  }, []);
+
+  const handleMainScrollUpdated = useCallback(() => {
+    handleMainScroll();
+    const main = mainRef.current;
+    const bottom = bottomBarRef.current;
+    if (!main || !bottom || isBottomScrolling.current) return;
+    bottom.scrollLeft = main.scrollLeft;
+  }, [handleMainScroll]);
+
+  useEffect(() => {
+    const main = mainRef.current;
+    const syncWidth = () => {
+      if (main && bottomInnerRef.current) {
+        bottomInnerRef.current.style.width = `${main.scrollWidth}px`;
+      }
+    };
+    syncWidth();
+    const observer = new ResizeObserver(syncWidth);
+    if (main) observer.observe(main);
+    return () => observer.disconnect();
+  }, [children]);
+
   return (
     <div className={`flex-1 flex flex-col overflow-hidden ${hasCustomBg ? '' : 'kanban-board-bg'}`} style={bgStyle} data-testid="kanban-scroll-area">
       {client?.kanbanBgImage && (
@@ -981,10 +1017,18 @@ function KanbanScrollArea({ children, client }: { children: React.ReactNode; cli
       </div>
       <div
         ref={mainRef}
-        className="flex-1 overflow-x-auto overflow-y-hidden relative"
-        onScroll={handleMainScroll}
+        className="flex-1 overflow-x-auto overflow-y-hidden relative kanban-bottom-scrollbar"
+        onScroll={handleMainScrollUpdated}
       >
         {children}
+      </div>
+      <div
+        ref={bottomBarRef}
+        className="overflow-x-auto overflow-y-hidden shrink-0 kanban-bottom-scrollbar"
+        onScroll={handleBottomScroll}
+        data-testid="kanban-bottom-scrollbar"
+      >
+        <div ref={bottomInnerRef} style={{ height: 1 }} />
       </div>
     </div>
   );

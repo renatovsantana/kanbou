@@ -323,30 +323,37 @@
   }
 
   .kanban-scroll::-webkit-scrollbar-thumb {
-    background: hsl(var(--muted-foreground) / 0.1);
+    background: hsl(var(--primary) / 0.3);
+    border-radius: 5px;
   }
 
   .kanban-scroll::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--muted-foreground) / 0.2);
+    background: hsl(var(--primary) / 0.5);
   }
 }
 
-.kanban-top-scrollbar {
+.kanban-top-scrollbar,
+.kanban-bottom-scrollbar {
   scrollbar-width: auto;
+  scrollbar-color: hsl(var(--primary) / 0.5) hsl(var(--primary) / 0.08);
 }
-.kanban-top-scrollbar::-webkit-scrollbar {
+.kanban-top-scrollbar::-webkit-scrollbar,
+.kanban-bottom-scrollbar::-webkit-scrollbar {
   height: 10px;
 }
-.kanban-top-scrollbar::-webkit-scrollbar-track {
-  background: hsl(var(--muted-foreground) / 0.05);
+.kanban-top-scrollbar::-webkit-scrollbar-track,
+.kanban-bottom-scrollbar::-webkit-scrollbar-track {
+  background: hsl(var(--primary) / 0.08);
   border-radius: 5px;
 }
-.kanban-top-scrollbar::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted-foreground) / 0.25);
+.kanban-top-scrollbar::-webkit-scrollbar-thumb,
+.kanban-bottom-scrollbar::-webkit-scrollbar-thumb {
+  background: hsl(var(--primary) / 0.5);
   border-radius: 5px;
 }
-.kanban-top-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground) / 0.4);
+.kanban-top-scrollbar::-webkit-scrollbar-thumb:hover,
+.kanban-bottom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--primary) / 0.7);
 }
 
 ::-webkit-scrollbar {
