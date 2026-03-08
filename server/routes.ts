@@ -1038,6 +1038,9 @@ export async function registerRoutes(
       const allClients = await storage.getClients();
       const clientMap = new Map(allClients.map(c => [c.id, c.name]));
 
+      const allPosts = await storage.getPosts();
+      const postKanbanIds = new Set(allPosts.filter(p => p.kanbanCardId).map(p => p.kanbanCardId));
+
       const COLUMN_STATUS_MAP: Record<string, string> = {
         "Fila": "Na Fila",
         "Desenvolvendo Design": "Em Produção",
@@ -1057,6 +1060,8 @@ export async function registerRoutes(
 
       const result: any[] = [];
       for (const { card, columnTitle } of filtered) {
+        if (postKanbanIds.has(card.id)) continue;
+
         let templateObj: Record<string, string> = {};
         try { if (card.templateData) templateObj = JSON.parse(card.templateData as string); } catch {}
 

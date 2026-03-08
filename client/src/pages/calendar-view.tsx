@@ -9,9 +9,8 @@ import {
   isBefore,
   startOfDay,
   startOfWeek,
-  endOfWeek,
   addDays,
-  isWithinInterval,
+  parseISO,
 } from "date-fns";
 import { StatusBadge } from "@/components/status-badge";
 import { PlatformIcon } from "@/components/platform-icon";
@@ -108,8 +107,16 @@ function normalizeStatus(status: string): string {
   return STATUS_LABELS[status] || status;
 }
 
+function safeParseDate(dateStr: string): Date {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    const [y, m, d] = dateStr.split("-").map(Number);
+    return new Date(y, m - 1, d);
+  }
+  return new Date(dateStr);
+}
+
 function ItemCard({ item }: { item: CalendarItem }) {
-  const dateObj = new Date(item.scheduledDate);
+  const dateObj = safeParseDate(item.scheduledDate);
   const isPast = isBefore(startOfDay(dateObj), startOfDay(new Date()));
   const statusColor = STATUS_COLORS[item.status] || "border-l-gray-300";
 
@@ -199,7 +206,7 @@ function WeekView({
       const dayItems = items
         .filter(
           (item) =>
-            item.scheduledDate && isSameDay(new Date(item.scheduledDate), d)
+            item.scheduledDate && isSameDay(safeParseDate(item.scheduledDate), d)
         )
         .sort((a, b) => {
           const timeA = a.scheduledTime || "99:99";
@@ -322,7 +329,7 @@ function MobileWeekView({
       const dayItems = items
         .filter(
           (item) =>
-            item.scheduledDate && isSameDay(new Date(item.scheduledDate), d)
+            item.scheduledDate && isSameDay(safeParseDate(item.scheduledDate), d)
         )
         .sort((a, b) => {
           const timeA = a.scheduledTime || "99:99";
@@ -419,6 +426,13 @@ export default function CalendarView() {
   const [platformFilter, setPlatformFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
+  const resetFilters = useCallback((cf: string, pf: string, sf: string) => {
+    setClientFilter(cf);
+    setPlatformFilter(pf);
+    setStatusFilter(sf);
+    setListPage(0);
+  }, []);
+
   const isLoading = postsLoading || cardsLoading;
 
   const allItems = useMemo(() => {
@@ -485,7 +499,7 @@ export default function CalendarView() {
     const map = new Map<string, CalendarItem[]>();
     for (const item of filteredItems) {
       if (!item.scheduledDate) continue;
-      const key = format(new Date(item.scheduledDate), "yyyy-MM-dd");
+      const key = format(safeParseDate(item.scheduledDate), "yyyy-MM-dd");
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(item);
     }
@@ -507,12 +521,12 @@ export default function CalendarView() {
     return filteredItems
       .filter((item) => {
         if (!item.scheduledDate) return false;
-        return !isBefore(new Date(item.scheduledDate), today);
+        return !isBefore(safeParseDate(item.scheduledDate), today);
       })
       .sort(
         (a, b) =>
-          new Date(a.scheduledDate).getTime() -
-          new Date(b.scheduledDate).getTime()
+          safeParseDate(a.scheduledDate).getTime() -
+          safeParseDate(b.scheduledDate).getTime()
       );
   }, [filteredItems]);
 
@@ -569,7 +583,7 @@ export default function CalendarView() {
     >
       <Filter className="w-4 h-4 text-muted-foreground" />
       {!isClient && (
-        <Select value={clientFilter} onValueChange={setClientFilter}>
+        <Select value={clientFilter} onValueChange={(v) => { setClientFilter(v); setListPage(0); }}>
           <SelectTrigger className="w-[160px]" data-testid="filter-client">
             <SelectValue placeholder="Todos os clientes" />
           </SelectTrigger>
@@ -583,7 +597,7 @@ export default function CalendarView() {
           </SelectContent>
         </Select>
       )}
-      <Select value={platformFilter} onValueChange={setPlatformFilter}>
+      <Select value={platformFilter} onValueChange={(v) => { setPlatformFilter(v); setListPage(0); }}>
         <SelectTrigger className="w-[140px]" data-testid="filter-platform">
           <SelectValue placeholder="Plataforma" />
         </SelectTrigger>
@@ -596,7 +610,7 @@ export default function CalendarView() {
           <SelectItem value="Blog">Blog</SelectItem>
         </SelectContent>
       </Select>
-      <Select value={statusFilter} onValueChange={setStatusFilter}>
+      <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setListPage(0); }}>
         <SelectTrigger className="w-[140px]" data-testid="filter-status">
           <SelectValue placeholder="Status" />
         </SelectTrigger>
@@ -615,11 +629,7 @@ export default function CalendarView() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => {
-            if (!isClient) setClientFilter("all");
-            setPlatformFilter("all");
-            setStatusFilter("all");
-          }}
+          onClick={() => resetFilters(isClient ? clientFilter : "all", "all", "all")}
           data-testid="button-clear-filters"
         >
           Limpar filtros
@@ -632,7 +642,7 @@ export default function CalendarView() {
     const today = startOfDay(new Date());
     return filteredItems.filter((item) => {
       if (!item.scheduledDate) return false;
-      const d = new Date(item.scheduledDate);
+      const d = safeParseDate(item.scheduledDate);
       return (
         isBefore(d, today) &&
         item.status !== "Postado" &&
@@ -723,7 +733,7 @@ export default function CalendarView() {
                           dayItems?.some(
                             (i) =>
                               isBefore(
-                                new Date(i.scheduledDate),
+                                safeParseDate(i.scheduledDate),
                                 startOfDay(new Date())
                               ) &&
                               i.status !== "Postado" &&
