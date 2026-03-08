@@ -11,9 +11,9 @@ import OpenAI from "openai";
  * Instância do cliente OpenAI configurada com a chave de API.
  * Prioriza AI_INTEGRATIONS_OPENAI_API_KEY e fallback para OPENAI_API_KEY.
  */
-const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
-});
+const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
+
+const openai = apiKey ? new OpenAI({ apiKey }) : null;
 
 /**
  * Sugere hashtags/tags relevantes para redes sociais com base nas informações do cliente.
@@ -25,6 +25,8 @@ const openai = new OpenAI({
  * @returns Lista de novas tags sugeridas em minúsculas, sem o símbolo #
  */
 export async function suggestTags(clientName: string, clientAbout: string, clientNotes: string, existingTags: string[]): Promise<string[]> {
+  if (!openai) return [];
+
   const prompt = `Você é um especialista em marketing digital e redes sociais no Brasil.
 Com base nas informações do cliente abaixo, sugira 10 hashtags/tags relevantes para uso em redes sociais.
 As tags devem ser em português do Brasil, sem o símbolo #, em minúsculas.
@@ -38,7 +40,7 @@ ${clientNotes ? `Notas: ${clientNotes}` : ""}
 Responda APENAS com as tags separadas por vírgula, sem numeração ou explicação.`;
 
   const response = await openai.chat.completions.create({
-    model: "gpt-5-nano",
+    model: "gpt-4o-mini",
     messages: [{ role: "user", content: prompt }],
     max_tokens: 200,
     temperature: 0.7,
@@ -59,6 +61,8 @@ Responda APENAS com as tags separadas por vírgula, sem numeração ou explicaç
  * @returns Lista de novos termos de mercado sugeridos em minúsculas
  */
 export async function suggestMarketTags(clientName: string, clientAbout: string, clientNotes: string, existingTags: string[]): Promise<string[]> {
+  if (!openai) return [];
+
   const prompt = `Você é um especialista em posicionamento de mercado e branding no Brasil.
 Com base nas informações do cliente abaixo, sugira 8 termos de posicionamento de mercado relevantes.
 Os termos devem ser em português do Brasil, em minúsculas, representando nichos, tendências e diferenciais competitivos.
@@ -71,7 +75,7 @@ ${clientNotes ? `Notas: ${clientNotes}` : ""}
 Responda APENAS com os termos separados por vírgula, sem numeração ou explicação.`;
 
   const response = await openai.chat.completions.create({
-    model: "gpt-5-nano",
+    model: "gpt-4o-mini",
     messages: [{ role: "user", content: prompt }],
     max_tokens: 200,
     temperature: 0.7,

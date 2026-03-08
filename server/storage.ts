@@ -821,7 +821,7 @@ export class DatabaseStorage implements IStorage {
 
   /** @inheritdoc */
   async updateKanbanCard(id: number, updates: Partial<InsertKanbanCard>): Promise<KanbanCard> {
-    const [c] = await db.update(kanbanCards).set(updates).where(eq(kanbanCards.id, id)).returning();
+    const [c] = await db.update(kanbanCards).set({ ...updates, updatedAt: new Date() }).where(eq(kanbanCards.id, id)).returning();
     return c;
   }
 
@@ -850,6 +850,7 @@ export class DatabaseStorage implements IStorage {
     const [c] = await db.update(kanbanCards).set({
       columnId: toColumnId,
       position: newPosition,
+      updatedAt: new Date(),
       ...(columnChanged ? { columnEnteredAt: new Date() } : {}),
     }).where(eq(kanbanCards.id, cardId)).returning();
     return c;

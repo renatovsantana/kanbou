@@ -64,6 +64,11 @@ app.use(express.urlencoded({ extended: false, limit: "10mb" }));
  * - Cookie httpOnly e sameSite lax para segurança
  * - Modo secure configurável via FORCE_HTTPS
  */
+if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
+  console.error("FATAL: SESSION_SECRET environment variable is required in production. Exiting.");
+  process.exit(1);
+}
+
 const PgSession = connectPgSimple(session);
 app.use(
   session({

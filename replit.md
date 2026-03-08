@@ -15,7 +15,7 @@ Preferred communication style: Simple, everyday language.
 - **UI/UX**: shadcn/ui (new-york style) built on Radix UI, styled with Tailwind CSS. Utilizes Recharts for analytics and react-day-picker for calendar views.
 - **State Management**: TanStack React Query for server state.
 - **Forms**: React Hook Form with Zod validation.
-- **Design**: Modern workspace aesthetic with a lime-green primary color, warm gray background, and dark sidebar with green accents. All user-facing text is in Brazilian Portuguese.
+- **Design**: Modern workspace aesthetic with orange primary color (#E05A17) and dark teal sidebar (#03222D). All user-facing text is in Brazilian Portuguese.
 - **Key Features**:
     - **Kanban Approval Workflow**: All materials go through client approval directly in Kanban. Cards can be sent for approval (→ "Em aprovação"), then client can Aprovar (→ "Aprovados"), Revisar (→ "Revisão"), or Reprovar (→ "Reprovados"). Undo button allows reversing any decision. Designer can resend from "Revisão". Protected columns prevent manual card moves except: Aprovados→Agendados/Postados, Agendados→Postados/Finalizados, Postados→Finalizados. Cards are draggable by entire card surface; double-click to open card details.
     - **Scheduling**: "Agendar Aprovado" feature for scheduling approved posts with a guided two-step process.

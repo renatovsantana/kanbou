@@ -345,6 +345,7 @@ export const kanbanCards = pgTable("kanban_cards", {
   columnEnteredAt: timestamp("column_entered_at").defaultNow(),
   createdBy: integer("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 /**

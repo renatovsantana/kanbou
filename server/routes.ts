@@ -38,6 +38,20 @@ setInterval(() => {
   }
 }, 60 * 1000);
 
+function parsePlatform(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw.filter((v): v is string => typeof v === "string");
+  if (typeof raw === "string") {
+    if (raw === "Todas") return ["Instagram", "Facebook", "LinkedIn", "TikTok"];
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed.filter((v): v is string => typeof v === "string");
+      if (typeof parsed === "string") return [parsed];
+    } catch {}
+    return [raw];
+  }
+  return [];
+}
+
 /**
  * Extracts the client IP address from the request.
  * Checks x-forwarded-for header for proxied requests.
@@ -477,8 +491,8 @@ export async function registerRoutes(
   /** POST /api/posts - Creates a new post. Requires internal role. Normalizes platform string to array. */
   app.post(api.posts.create.path, requireRole(...INTERNAL_ROLES), async (req, res) => {
     try {
-      if (req.body.platform && typeof req.body.platform === 'string') {
-        req.body.platform = [req.body.platform];
+      if (req.body.platform != null) {
+        req.body.platform = parsePlatform(req.body.platform);
       }
       const input = api.posts.create.input.parse(req.body);
       const post = await storage.createPost(input);
@@ -502,8 +516,8 @@ export async function registerRoutes(
       if (!existingPost) {
         return res.status(404).json({ message: 'Post não encontrado' });
       }
-      if (req.body.platform && typeof req.body.platform === 'string') {
-        req.body.platform = [req.body.platform];
+      if (req.body.platform != null) {
+        req.body.platform = parsePlatform(req.body.platform);
       }
       const input = api.posts.update.input.parse(req.body);
       const updatedPost = await storage.updatePost(id, input);
@@ -719,7 +733,7 @@ export async function registerRoutes(
             }
             const driveFiles: Array<{ fileId: string; fileUrl: string; downloadUrl: string; fileName: string }> = [];
 
-            const baseUrl = `http://localhost:${process.env.PORT || 5000}`;
+            const baseUrl = process.env.APP_BASE_URL || `http://localhost:${process.env.PORT || 5000}`;
             for (let i = 0; i < imageUrls.length; i++) {
               try {
                 const imgUrl = imageUrls[i];
@@ -1037,15 +1051,7 @@ export async function registerRoutes(
         const scheduledDate = templateObj.publishDate || templateObj.deadline;
         if (!scheduledDate) continue;
 
-        let platforms: string[] = [];
-        try {
-          if (templateObj.platform) {
-            const parsed = JSON.parse(templateObj.platform);
-            platforms = Array.isArray(parsed) ? parsed : [parsed];
-          }
-        } catch {
-          if (templateObj.platform) platforms = [templateObj.platform];
-        }
+        const platforms = parsePlatform(templateObj.platform);
 
         const status = columnTitle === "Postados" ? "Postado" : "Agendado";
 
@@ -2382,7 +2388,23 @@ export async function registerRoutes(
    * Requires authentication.
    */
   app.put("/api/kanban/cards/:id", requireAuth, async (req, res) => {
-    const card = await storage.updateKanbanCard(Number(req.params.id), req.body);
+    const user = await getCurrentUser(req);
+    const existingCard = await storage.getKanbanCard(Number(req.params.id));
+    if (!existingCard) return res.status(404).json({ message: "Cartão não encontrado" });
+
+    if (user?.role === "client" && user.clientId !== existingCard.clientId) {
+      return res.status(403).json({ message: "Sem permissão" });
+    }
+
+    const updates = { ...req.body };
+    if (user?.role === "client") {
+      delete updates.approvalStatus;
+      delete updates.approvalNotes;
+      delete updates.approvalSentAt;
+      delete updates.approvalResolvedAt;
+    }
+
+    const card = await storage.updateKanbanCard(Number(req.params.id), updates);
     res.json(card);
   });
 
@@ -2410,6 +2432,10 @@ export async function registerRoutes(
 
     const oldCard = await storage.getKanbanCard(cardId);
     if (!oldCard) return res.status(404).json({ message: "Cartão não encontrado" });
+
+    if (user?.role === "client" && user.clientId !== oldCard.clientId) {
+      return res.status(403).json({ message: "Sem permissão" });
+    }
 
     const oldColumnId = oldCard.columnId;
 
@@ -2714,14 +2740,8 @@ export async function registerRoutes(
         if (card.templateData) templateObj = JSON.parse(card.templateData as string);
       } catch {}
 
-      let platform: string[] = ["Instagram"];
-      if (templateObj.platform) {
-        if (templateObj.platform === "Todas") {
-          platform = ["Instagram", "Facebook", "LinkedIn", "TikTok"];
-        } else {
-          platform = [templateObj.platform];
-        }
-      }
+      const parsedPlatform = parsePlatform(templateObj.platform);
+      const platform = parsedPlatform.length > 0 ? parsedPlatform : ["Instagram"];
 
       let scheduledDate = new Date();
       scheduledDate.setDate(scheduledDate.getDate() + 1);

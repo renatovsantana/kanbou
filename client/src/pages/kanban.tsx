@@ -71,7 +71,6 @@ import {
   Trash2,
   Calendar,
   Paperclip,
-  MessageSquare,
   GripVertical,
   Loader2,
   X,
@@ -94,6 +93,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useSearch } from "wouter";
 import { useSidebarCollapse } from "@/components/layout";
+import { useAuth } from "@/lib/auth";
 
 /** Map of label color names to their corresponding Tailwind background classes */
 const LABEL_COLORS: Record<string, string> = {
@@ -151,11 +151,14 @@ function useAccumulatedTimer(accumulatedSeconds: number, openSince: string | nul
 /** Map of card types to their accent hex color for left border and type badge */
 const CARD_TYPE_ACCENT: Record<string, string> = {
   post: "#3b82f6",
+  video: "#06b6d4",
   material_offline: "#f59e0b",
   material_digital: "#a855f7",
   copy: "#10b981",
   roteiro: "#ef4444",
   identidade_visual: "#ec4899",
+  reuniao: "#f97316",
+  captacao: "#84cc16",
   geral: "#6b7280",
 };
 
@@ -175,12 +178,14 @@ function SortableCard({
   columnTitle,
   onScheduleCard,
   columnTimeData,
+  userMap,
 }: {
   card: KanbanCard;
   onCardClick: (card: KanbanCard) => void;
   columnTitle?: string;
   onScheduleCard?: (card: KanbanCard) => void;
   columnTimeData?: { accumulatedSeconds: number; openSince: string | null };
+  userMap?: Record<number, string>;
 }) {
   const {
     attributes,
@@ -321,7 +326,7 @@ function SortableCard({
                 {card.assignedUserIds.slice(0, 3).map((uid) => (
                   <Avatar key={uid} className="w-5 h-5 ring-2 ring-card" data-testid={`avatar-user-${uid}-card-${card.id}`}>
                     <AvatarFallback className="text-[8px] font-bold bg-primary/20 text-primary">
-                      {String(uid).slice(0, 2)}
+                      {(userMap?.[uid] || String(uid)).split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                 ))}
@@ -439,6 +444,7 @@ function DroppableColumn({
   onScheduleCard,
   columnTimesData,
   clientId,
+  userMap,
 }: {
   column: KanbanColumn;
   cards: KanbanCard[];
@@ -449,6 +455,7 @@ function DroppableColumn({
   onScheduleCard?: (card: KanbanCard) => void;
   columnTimesData?: Record<number, { accumulatedSeconds: number; openSince: string | null }>;
   clientId?: number;
+  userMap?: Record<number, string>;
 }) {
   const { setNodeRef } = useDroppable({ id: `column-${column.id}` });
   const [isEditing, setIsEditing] = useState(false);
@@ -558,7 +565,7 @@ function DroppableColumn({
         >
           <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
             {normalCards.map((card) => (
-              <SortableCard key={card.id} card={card} onCardClick={onCardClick} columnTitle={column.title} onScheduleCard={onScheduleCard} columnTimeData={columnTimesData?.[card.id]} />
+              <SortableCard key={card.id} card={card} onCardClick={onCardClick} columnTitle={column.title} onScheduleCard={onScheduleCard} columnTimeData={columnTimesData?.[card.id]} userMap={userMap} />
             ))}
             {overdueCards.length > 0 && (
               <>
@@ -571,7 +578,7 @@ function DroppableColumn({
                   <div className="h-px flex-1 bg-destructive/30" />
                 </div>
                 {overdueCards.map((card) => (
-                  <SortableCard key={card.id} card={card} onCardClick={onCardClick} columnTitle={column.title} onScheduleCard={onScheduleCard} columnTimeData={columnTimesData?.[card.id]} />
+                  <SortableCard key={card.id} card={card} onCardClick={onCardClick} columnTitle={column.title} onScheduleCard={onScheduleCard} columnTimeData={columnTimesData?.[card.id]} userMap={userMap} />
                 ))}
               </>
             )}
@@ -991,6 +998,8 @@ function KanbanScrollArea({ children, client }: { children: React.ReactNode; cli
  */
 export default function KanbanBoard() {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const isClient = user?.role === "client";
   const searchString = useSearch();
   const urlParams = new URLSearchParams(searchString);
   const initialClientId = urlParams.get("clientId") || "";
@@ -1024,6 +1033,12 @@ export default function KanbanBoard() {
     queryKey: ["/api/clients"],
   });
 
+  useEffect(() => {
+    if (isClient && !selectedClientId && clients.length === 1) {
+      setSelectedClientId(String(clients[0].id));
+    }
+  }, [isClient, clients, selectedClientId]);
+
   const clientId = selectedClientId ? Number(selectedClientId) : null;
 
   const { data: columns = [], isLoading: loadingColumns } = useQuery<KanbanColumn[]>({
@@ -1049,6 +1064,16 @@ export default function KanbanBoard() {
     refetchInterval: 30000,
     refetchOnWindowFocus: true,
   });
+
+  const { data: allUsers = [] } = useQuery<{ id: number; name: string }[]>({
+    queryKey: ["/api/users"],
+    enabled: !isClient,
+  });
+  const userMap = useMemo(() => {
+    const m: Record<number, string> = {};
+    for (const u of allUsers) m[u.id] = u.name;
+    return m;
+  }, [allUsers]);
 
   const sortedColumns = useMemo(
     () => [...columns].sort((a, b) => a.position - b.position),
@@ -1325,25 +1350,27 @@ export default function KanbanBoard() {
           >
             <RefreshCw className="w-4 h-4" />
           </Button>
-          {selectedClient && clientId && <KanbanColumnManager clientId={clientId} columns={columns} />}
-          {selectedClient && <KanbanBgSettings client={selectedClient} />}
-          <Select
-            value={selectedClientId}
-            onValueChange={setSelectedClientId}
-          >
-            <SelectTrigger className="w-[220px]" data-testid="select-client">
-              <SelectValue placeholder="Selecionar cliente..." />
-            </SelectTrigger>
-            <SelectContent>
-              {clients
-                .filter((c) => c.isActive !== false)
-                .map((c) => (
-                  <SelectItem key={c.id} value={String(c.id)} data-testid={`option-client-${c.id}`}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
+          {!isClient && selectedClient && clientId && <KanbanColumnManager clientId={clientId} columns={columns} />}
+          {!isClient && selectedClient && <KanbanBgSettings client={selectedClient} />}
+          {!isClient && (
+            <Select
+              value={selectedClientId}
+              onValueChange={setSelectedClientId}
+            >
+              <SelectTrigger className="w-[220px]" data-testid="select-client">
+                <SelectValue placeholder="Selecionar cliente..." />
+              </SelectTrigger>
+              <SelectContent>
+                {clients
+                  .filter((c) => c.isActive !== false)
+                  .map((c) => (
+                    <SelectItem key={c.id} value={String(c.id)} data-testid={`option-client-${c.id}`}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
       </div>
 
@@ -1384,60 +1411,63 @@ export default function KanbanBoard() {
                   onScheduleCard={setScheduleConfirmCard}
                   columnTimesData={columnTimesData}
                   clientId={clientId || undefined}
+                  userMap={userMap}
                 />
               ))}
 
-              <div className="w-[280px] shrink-0">
-                {addingColumn ? (
-                  <div className="kanban-column rounded-lg p-3 space-y-2">
-                    <Input
-                      ref={newColRef}
-                      value={newColumnTitle}
-                      onChange={(e) => setNewColumnTitle(e.target.value)}
-                      placeholder="Titulo da coluna..."
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") handleAddColumn();
-                        if (e.key === "Escape") {
-                          setNewColumnTitle("");
-                          setAddingColumn(false);
-                        }
-                      }}
-                      className="text-sm"
-                      data-testid="input-new-column"
-                    />
-                    <div className="flex items-center gap-1">
-                      <Button
-                        size="sm"
-                        onClick={handleAddColumn}
-                        disabled={!newColumnTitle.trim()}
-                        data-testid="button-submit-column"
-                      >
-                        Adicionar
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setNewColumnTitle("");
-                          setAddingColumn(false);
+              {!isClient && (
+                <div className="w-[280px] shrink-0">
+                  {addingColumn ? (
+                    <div className="kanban-column rounded-lg p-3 space-y-2">
+                      <Input
+                        ref={newColRef}
+                        value={newColumnTitle}
+                        onChange={(e) => setNewColumnTitle(e.target.value)}
+                        placeholder="Titulo da coluna..."
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleAddColumn();
+                          if (e.key === "Escape") {
+                            setNewColumnTitle("");
+                            setAddingColumn(false);
+                          }
                         }}
-                        data-testid="button-cancel-column"
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
+                        className="text-sm"
+                        data-testid="input-new-column"
+                      />
+                      <div className="flex items-center gap-1">
+                        <Button
+                          size="sm"
+                          onClick={handleAddColumn}
+                          disabled={!newColumnTitle.trim()}
+                          data-testid="button-submit-column"
+                        >
+                          Adicionar
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setNewColumnTitle("");
+                            setAddingColumn(false);
+                          }}
+                          data-testid="button-cancel-column"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                ) : (
-                  <button
-                    className="w-full flex items-center gap-2 px-4 py-3 rounded-lg text-sm font-medium text-white/60 hover:text-white/90 bg-white/5 hover:bg-white/10 border border-dashed border-white/15 hover:border-white/25 transition-all duration-200"
-                    onClick={() => setAddingColumn(true)}
-                    data-testid="button-add-column"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Adicionar coluna
-                  </button>
-                )}
-              </div>
+                  ) : (
+                    <button
+                      className="w-full flex items-center gap-2 px-4 py-3 rounded-lg text-sm font-medium text-white/60 hover:text-white/90 bg-white/5 hover:bg-white/10 border border-dashed border-white/15 hover:border-white/25 transition-all duration-200"
+                      onClick={() => setAddingColumn(true)}
+                      data-testid="button-add-column"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Adicionar coluna
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
             <DragOverlay>

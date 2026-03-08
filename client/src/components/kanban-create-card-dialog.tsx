@@ -74,6 +74,18 @@ export function KanbanCreateCardDialog({
     queryKey: [`/api/onboarding/${clientId}/text-templates`],
     enabled: !!clientId,
   });
+  const { data: clientData } = useQuery<{ enableReuniao?: boolean; enableCaptacao?: boolean }>({
+    queryKey: ['/api/clients', clientId],
+    enabled: !!clientId,
+  });
+
+  const availableTypes = CARD_TYPES.filter((type) => {
+    if (!clientData) return true;
+    if (type === "reuniao" && !clientData.enableReuniao) return false;
+    if (type === "captacao" && !clientData.enableCaptacao) return false;
+    return true;
+  });
+
   const [step, setStep] = useState<1 | 2>(1);
   const [selectedType, setSelectedType] = useState<CardType | null>(null);
   const [title, setTitle] = useState("");
@@ -174,7 +186,7 @@ export function KanbanCreateCardDialog({
               Selecione o tipo de cartão:
             </p>
             <div className="grid grid-cols-2 gap-2">
-              {CARD_TYPES.map((type) => {
+              {availableTypes.map((type) => {
                 const Icon = CARD_TYPE_ICONS[type];
                 const colorClass = CARD_TYPE_COLORS[type];
                 return (
