@@ -1,8 +1,18 @@
+/**
+ * @module use-clients
+ * TanStack Query hooks for CRUD operations on clients.
+ * Each hook wraps the shared API route definitions and provides toast feedback.
+ */
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
 import type { CreateClientRequest, UpdateClientRequest } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 
+/**
+ * Fetches the full list of clients from the API.
+ *
+ * @returns A TanStack Query result containing the array of clients.
+ */
 export function useClients() {
   return useQuery({
     queryKey: [api.clients.list.path],
@@ -14,6 +24,12 @@ export function useClients() {
   });
 }
 
+/**
+ * Fetches a single client by ID. Returns `null` when the client is not found (404).
+ *
+ * @param id - The client ID to fetch.
+ * @returns A TanStack Query result containing the client or `null`.
+ */
 export function useClient(id: number) {
   return useQuery({
     queryKey: [api.clients.get.path, id],
@@ -28,6 +44,12 @@ export function useClient(id: number) {
   });
 }
 
+/**
+ * Mutation hook to create a new client.
+ * Invalidates the client list query and shows a success/error toast on completion.
+ *
+ * @returns A TanStack `useMutation` result whose `mutationFn` accepts a `CreateClientRequest`.
+ */
 export function useCreateClient() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -56,6 +78,12 @@ export function useCreateClient() {
   });
 }
 
+/**
+ * Mutation hook to update an existing client.
+ * Invalidates the client list query and shows a success/error toast on completion.
+ *
+ * @returns A TanStack `useMutation` result whose `mutationFn` accepts `{ id, ...UpdateClientRequest }`.
+ */
 export function useUpdateClient() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -85,6 +113,12 @@ export function useUpdateClient() {
   });
 }
 
+/**
+ * Mutation hook to delete a client by ID.
+ * Invalidates the client list query and shows a success/error toast on completion.
+ *
+ * @returns A TanStack `useMutation` result whose `mutationFn` accepts a client `id`.
+ */
 export function useDeleteClient() {
   const queryClient = useQueryClient();
   const { toast } = useToast();

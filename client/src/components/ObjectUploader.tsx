@@ -1,3 +1,8 @@
+/**
+ * @module ObjectUploader
+ * Button + modal component for uploading files via Uppy with presigned S3 URLs.
+ * Wraps Uppy's Dashboard modal and AWS S3 plugin behind a single trigger button.
+ */
 import { useState } from "react";
 import type { ReactNode } from "react";
 import Uppy from "@uppy/core";
@@ -8,6 +13,7 @@ import "@uppy/dashboard/css/style.min.css";
 import AwsS3 from "@uppy/aws-s3";
 import { Button } from "@/components/ui/button";
 
+/** Props for the {@link ObjectUploader} component. */
 interface ObjectUploaderProps {
   maxNumberOfFiles?: number;
   maxFileSize?: number;

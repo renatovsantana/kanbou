@@ -1,5 +1,11 @@
+/**
+ * @module status-badge
+ * Displays a coloured badge with a status dot indicator.
+ * Used throughout the app for post and card status visualisation.
+ */
 import { cn } from "@/lib/utils";
 
+/** Colour, dot, and label configuration for each known status string. */
 const statusConfig = {
   Agendado: {
     color: "bg-primary/15 text-foreground border-primary/25",
@@ -48,6 +54,12 @@ const statusConfig = {
   },
 } as const;
 
+/**
+ * Renders a pill-shaped badge with a coloured dot and label for the given status.
+ * Falls back to the "Agendado" (Scheduled) configuration for unknown statuses.
+ *
+ * @param status - The status string (e.g. "Agendado", "Postado", "Cancelado").
+ */
 export function StatusBadge({ status }: { status: string }) {
   const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.Agendado;
 

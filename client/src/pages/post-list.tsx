@@ -1,3 +1,10 @@
+/**
+ * @module post-list
+ * Post management page.
+ * Displays all social-media posts grouped by date with filters for search, client,
+ * platform, and status. Supports creating manual posts, editing, deleting, and
+ * scheduling approved materials from the Kanban board or approval flow.
+ */
 import { useState, useMemo } from "react";
 import { usePosts, useDeletePost } from "@/hooks/use-posts";
 import { useSearch, useLocation } from "wouter";

@@ -1,3 +1,9 @@
+/**
+ * @module login
+ * Login page component.
+ * Renders a split-screen layout with branding on the left and a credential form on the right.
+ * Supports "remember me" via localStorage and dynamically loads system branding.
+ */
 import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth";
 import { useLocation } from "wouter";
@@ -10,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 
+/** Shape of the branding settings returned by `/api/settings/branding`. */
 type BrandingData = {
   systemName: string;
   systemLogo: string;
@@ -17,6 +24,10 @@ type BrandingData = {
   systemTheme: string;
 };
 
+/**
+ * Login page with email/password form, "remember me" toggle, and system branding.
+ * On successful authentication the user is redirected to the dashboard.
+ */
 export default function LoginPage() {
   const { login } = useAuth();
   const [, setLocation] = useLocation();

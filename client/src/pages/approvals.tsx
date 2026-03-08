@@ -81,6 +81,7 @@ import {
   Check,
 } from "lucide-react";
 
+/** Available social media platform options for approval posts */
 const PLATFORM_OPTIONS = [
   { value: "Instagram", label: "Instagram" },
   { value: "Facebook", label: "Facebook" },
@@ -92,6 +93,7 @@ const PLATFORM_OPTIONS = [
   { value: "Pinterest", label: "Pinterest" },
 ];
 
+/** Zod schema for validating the approval post creation/edit form */
 const approvalFormSchema = insertApprovalPostSchema.extend({
   clientId: z.coerce.number().min(1, "Selecione um cliente"),
   title: z.string().min(1, "Título é obrigatório"),
@@ -101,15 +103,19 @@ const approvalFormSchema = insertApprovalPostSchema.extend({
   scheduledDate: z.coerce.date().nullable().optional(),
 });
 
+/** Inferred type from the approval form validation schema */
 type ApprovalFormValues = z.infer<typeof approvalFormSchema>;
 
+/** Available drawing tools for the annotation canvas */
 type AnnotationTool = "pencil" | "arrow" | "circle" | "text";
 
+/** A 2D point used in annotation drawings */
 interface DrawPoint {
   x: number;
   y: number;
 }
 
+/** A single annotation drawn on the canvas (path, shape, or text) */
 interface Annotation {
   tool: AnnotationTool;
   color: string;
@@ -118,6 +124,7 @@ interface Annotation {
   text?: string;
 }
 
+/** V2 annotation data format that stores original image dimensions for scale-independent annotations */
 interface AnnotationDataV2 {
   v: 2;
   imgW: number;
@@ -125,6 +132,10 @@ interface AnnotationDataV2 {
   data: Annotation[];
 }
 
+/**
+ * Parses raw annotation JSON into structured annotation data.
+ * Supports both V1 (plain array) and V2 (with image dimensions) formats.
+ */
 function parseAnnotations(raw: string | null | undefined): { annotations: Annotation[]; imgW: number; imgH: number; isV2: boolean } {
   if (!raw) return { annotations: [], imgW: 0, imgH: 0, isV2: false };
   try {
@@ -141,6 +152,7 @@ function parseAnnotations(raw: string | null | undefined): { annotations: Annota
   }
 }
 
+/** Converts annotation points from canvas coordinates to original image coordinates */
 function toImageSpace(ann: Annotation, canvasW: number, canvasH: number, imgW: number, imgH: number): Annotation {
   const scale = Math.min(canvasW / imgW, canvasH / imgH);
   const offsetX = (canvasW - imgW * scale) / 2;
@@ -154,6 +166,7 @@ function toImageSpace(ann: Annotation, canvasW: number, canvasH: number, imgW: n
   };
 }
 
+/** Converts annotation points from original image coordinates to canvas coordinates */
 function fromImageSpace(ann: Annotation, canvasW: number, canvasH: number, imgW: number, imgH: number): Annotation {
   const scale = Math.min(canvasW / imgW, canvasH / imgH);
   const offsetX = (canvasW - imgW * scale) / 2;
@@ -167,6 +180,7 @@ function fromImageSpace(ann: Annotation, canvasW: number, canvasH: number, imgW:
   };
 }
 
+/** Renders a single annotation (pencil, arrow, circle, or text) onto a canvas 2D context */
 function drawAnnotationOnCtx(ctx: CanvasRenderingContext2D, ann: Annotation) {
   ctx.strokeStyle = ann.color;
   ctx.fillStyle = ann.color;
@@ -225,6 +239,10 @@ function drawAnnotationOnCtx(ctx: CanvasRenderingContext2D, ann: Annotation) {
   }
 }
 
+/**
+ * AnnotationOverlay - Renders an image with annotation drawings overlaid on a canvas.
+ * Used for displaying client annotations on approval post images.
+ */
 function AnnotationOverlay({
   imageUrl,
   annotations,
@@ -307,6 +325,10 @@ function AnnotationOverlay({
   );
 }
 
+/**
+ * ImageLightbox - Full-screen image viewer with zoom/pan controls and annotation overlay.
+ * Supports keyboard shortcuts (+/- for zoom, 0 for reset, Escape to close) and mouse wheel zoom.
+ */
 function ImageLightbox({
   imageUrl,
   annotations,
@@ -517,6 +539,7 @@ function ImageLightbox({
   );
 }
 
+/** Renders a colored status badge (Aprovado, Revisão, Revisado, or Pendente) for approval posts */
 function ApprovalStatusBadge({ status }: { status: string }) {
   switch (status) {
     case "Aprovado":
@@ -550,6 +573,11 @@ function ApprovalStatusBadge({ status }: { status: string }) {
   }
 }
 
+/**
+ * AnnotationCanvas - Interactive drawing canvas for creating annotations on post images.
+ * Provides pencil, arrow, circle, and text tools with color selection, undo, and clear actions.
+ * Saves annotations in V2 format with original image dimensions for resolution independence.
+ */
 function AnnotationCanvas({
   imageUrl,
   existingAnnotations,
@@ -825,6 +853,7 @@ function AnnotationCanvas({
   );
 }
 
+/** Returns the array of image URLs for a post, falling back to the single imageUrl */
 function getPostImages(post: ApprovalPost): string[] {
   if (post.imageUrls && post.imageUrls.length > 0) {
     return post.imageUrls;
@@ -832,6 +861,7 @@ function getPostImages(post: ApprovalPost): string[] {
   return [post.imageUrl];
 }
 
+/** Downloads a single image by fetching it as a blob and triggering a download */
 async function downloadImage(url: string, filename: string) {
   try {
     const response = await fetch(url);
@@ -849,6 +879,7 @@ async function downloadImage(url: string, filename: string) {
   }
 }
 
+/** Downloads all images from a post, naming them sequentially for carousel posts */
 async function downloadAllImages(post: ApprovalPost) {
   const images = getPostImages(post);
   const baseName = post.title.replace(/[^a-zA-Z0-9À-ú\s-]/g, "").replace(/\s+/g, "-");
@@ -862,6 +893,7 @@ async function downloadAllImages(post: ApprovalPost) {
   }
 }
 
+/** Button that copies text to clipboard and shows a check icon briefly upon success */
 function CopyButton({ text, testId }: { text: string; testId: string }) {
   const [copied, setCopied] = useState(false);
   return (
@@ -882,6 +914,10 @@ function CopyButton({ text, testId }: { text: string; testId: string }) {
   );
 }
 
+/**
+ * ApprovalCard - Card component displaying an approval post with thumbnail, status, platforms, and action buttons.
+ * Shows different actions based on user role (client vs admin/designer).
+ */
 function ApprovalCard({
   post,
   onView,
@@ -1064,6 +1100,10 @@ function ApprovalCard({
   );
 }
 
+/**
+ * ReviewDialog - Modal for submitting a revision request with observations and caption suggestions.
+ * Shows the current image and caption for reference while writing feedback.
+ */
 function ReviewDialog({
   post,
   open,
@@ -1166,6 +1206,12 @@ function ReviewDialog({
   );
 }
 
+/**
+ * Approvals - Main approval management page for internal users and clients.
+ * Internal users see a client overview grid and can create, view, annotate, review, and resubmit posts.
+ * Clients see their posts organized by period with approve/revision actions.
+ * Supports version history, period-based grouping, status filtering, and search.
+ */
 export default function Approvals() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -1312,6 +1358,7 @@ export default function Approvals() {
     },
   });
 
+  /** Processes the create form submission, resolving client name and normalizing image URLs */
   const onSubmit = (values: ApprovalFormValues) => {
     const client = clientsList.find((c) => c.id === values.clientId);
     const imageUrls = values.imageUrls && values.imageUrls.length > 0 ? values.imageUrls : [values.imageUrl];
@@ -1324,6 +1371,7 @@ export default function Approvals() {
     });
   };
 
+  /** Handles file input change for multi-image upload in the create form */
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files) {
@@ -1333,10 +1381,12 @@ export default function Approvals() {
     }
   };
 
+  /** Updates a post's approval status (Aprovado, Revisão, etc.) */
   const handleStatusChange = (id: number, newStatus: string) => {
     updateMutation.mutate({ id, data: { status: newStatus } });
   };
 
+  /** Saves annotation data for the currently annotated post */
   const handleAnnotationSave = (annotations: string) => {
     if (annotatingPost) {
       updateMutation.mutate({ id: annotatingPost.id, data: { annotations } });
@@ -1344,6 +1394,7 @@ export default function Approvals() {
     }
   };
 
+  /** Submits a review with observations and caption suggestions, updating the post status to Revisão */
   const handleReviewSubmit = (data: { observations: string; captionSuggestion: string }) => {
     if (reviewingPost) {
       updateMutation.mutate({
@@ -1395,6 +1446,7 @@ export default function Approvals() {
     },
   });
 
+  /** Opens the resubmit dialog pre-filled with the original post's data */
   const handleOpenResubmit = (post: ApprovalPost) => {
     setResubmitPost(post);
     resubmitForm.reset({
@@ -1409,6 +1461,7 @@ export default function Approvals() {
     });
   };
 
+  /** Handles file input change for the resubmit form image upload */
   const handleResubmitFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -1416,12 +1469,14 @@ export default function Approvals() {
     }
   };
 
+  /** Processes the resubmit form, creating a new version and marking the original as Revisado */
   const onResubmitSubmit = (values: ApprovalFormValues) => {
     if (resubmitPost) {
       resubmitMutation.mutate({ originalPost: resubmitPost, newData: values });
     }
   };
 
+  /** Builds the full version history chain for a post by traversing parent/child relationships */
   const getVersionHistory = useCallback((post: ApprovalPost) => {
     const versions: ApprovalPost[] = [];
     let current: ApprovalPost | undefined = post;
@@ -1444,6 +1499,7 @@ export default function Approvals() {
 
   const resubmitImageUrl = resubmitForm.watch("imageUrl");
 
+  /** Filters approvals by selected client, status, and search term */
   const clientPosts = useMemo(() => {
     if (!selectedClientId) return [];
     let result = approvals.filter((a) => a.clientId === selectedClientId);
@@ -1461,6 +1517,7 @@ export default function Approvals() {
     return result;
   }, [approvals, selectedClientId, statusFilter, searchTerm]);
 
+  /** Computes status counts for the currently selected client's posts */
   const clientStatusCounts = useMemo(() => {
     const posts = selectedClientId ? approvals.filter((a) => a.clientId === selectedClientId) : approvals;
     return {
@@ -1474,6 +1531,7 @@ export default function Approvals() {
 
   const MONTH_NAMES_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
+  /** Groups client posts by month/year period and sorts them by status priority */
   const groupedByPeriod = useMemo(() => {
     const groups: Record<string, { label: string; sortKey: string; posts: ApprovalPost[] }> = {};
     for (const post of clientPosts) {
@@ -1507,6 +1565,7 @@ export default function Approvals() {
     return periods;
   }, [clientPosts]);
 
+  /** Aggregates approval data by client for the overview grid (counts, latest dates) */
   const clientOverviewData = useMemo(() => {
     const groups: Record<number, { clientId: number; clientName: string; total: number; pending: number; approved: number; revision: number; latestDate: Date | null }> = {};
     for (const post of approvals) {
@@ -1526,6 +1585,7 @@ export default function Approvals() {
     return Object.values(groups).sort((a, b) => a.clientName.localeCompare(b.clientName));
   }, [approvals]);
 
+  /** Resolves the display name for the currently selected client */
   const selectedClientName = useMemo(() => {
     if (!selectedClientId) return "";
     const found = clientsList.find((c) => c.id === selectedClientId);
@@ -1534,6 +1594,7 @@ export default function Approvals() {
     return fromApprovals?.clientName || "";
   }, [selectedClientId, clientsList, approvals]);
 
+  /** Toggles the collapsed state of a period group in the list view */
   const togglePeriodCollapse = (key: string) => {
     setCollapsedPeriods((prev) => {
       const next = new Set(prev);

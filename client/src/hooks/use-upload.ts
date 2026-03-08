@@ -1,18 +1,26 @@
+/**
+ * @module use-upload
+ * React hook for uploading files via the presigned-URL flow.
+ * Also exposes an Uppy-compatible `getUploadParameters` function for the ObjectUploader component.
+ */
 import { useState, useCallback } from "react";
 import type { UppyFile } from "@uppy/core";
 
+/** Metadata sent to the backend when requesting a presigned upload URL. */
 interface UploadMetadata {
   name: string;
   size: number;
   contentType: string;
 }
 
+/** Shape of the backend response containing the presigned URL and storage path. */
 interface UploadResponse {
   uploadURL: string;
   objectPath: string;
   metadata: UploadMetadata;
 }
 
+/** Configuration callbacks for the `useUpload` hook. */
 interface UseUploadOptions {
   onSuccess?: (response: UploadResponse) => void;
   onError?: (error: Error) => void;

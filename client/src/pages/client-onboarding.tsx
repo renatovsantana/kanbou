@@ -67,6 +67,7 @@ import { SiInstagram, SiFacebook, SiTiktok, SiLinkedin, SiYoutube } from "react-
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
+/** Data structure for a client's product */
 interface ClientProduct {
   id: number;
   clientId: number;
@@ -74,6 +75,7 @@ interface ClientProduct {
   description: string | null;
   createdAt: string;
 }
+/** Data structure for a client's service */
 interface ClientService {
   id: number;
   clientId: number;
@@ -81,6 +83,7 @@ interface ClientService {
   description: string | null;
   createdAt: string;
 }
+/** Data structure for a client's social media credential */
 interface ClientCredential {
   id: number;
   clientId: number;
@@ -90,6 +93,7 @@ interface ClientCredential {
   notes: string | null;
   createdAt: string;
 }
+/** Supported social media platforms with their icons for credential management */
 const SOCIAL_PLATFORMS = [
   { value: "Instagram", icon: SiInstagram },
   { value: "Facebook", icon: SiFacebook },
@@ -101,6 +105,13 @@ const SOCIAL_PLATFORMS = [
   { value: "Outro", icon: Globe },
 ];
 
+/**
+ * Client Onboarding page component.
+ * Provides a comprehensive client management interface with sections for: about/description,
+ * notes, market tags, hashtags, products, services, link page configuration, credentials,
+ * brand identity files, competitors, kanban settings, and access control.
+ * Role-aware: clients auto-select their own client; admins/designers can select any client.
+ */
 export default function ClientOnboarding() {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -212,6 +223,11 @@ export default function ClientOnboarding() {
   );
 }
 
+/**
+ * Editable "About" section for a client's description using a rich text editor.
+ * @param clientId - The client's ID
+ * @param client - The client object with current about text
+ */
 function AboutSection({ clientId, client }: { clientId: number; client?: Client }) {
   const { toast } = useToast();
   const [editing, setEditing] = useState(false);
@@ -261,6 +277,11 @@ function AboutSection({ clientId, client }: { clientId: number; client?: Client 
   );
 }
 
+/**
+ * Editable free-form notes section for internal annotations about a client.
+ * @param clientId - The client's ID
+ * @param client - The client object with current notes
+ */
 function NotesSection({ clientId, client }: { clientId: number; client?: Client }) {
   const { toast } = useToast();
   const [editing, setEditing] = useState(false);
@@ -310,6 +331,12 @@ function NotesSection({ clientId, client }: { clientId: number; client?: Client 
   );
 }
 
+/**
+ * Editable tags and hashtags section for a client.
+ * Allows adding, removing, and saving tags that are used for content organization.
+ * @param clientId - The client's ID
+ * @param client - The client object with current tags
+ */
 function TagsSection({ clientId, client }: { clientId: number; client?: Client }) {
   const { toast } = useToast();
   const [editing, setEditing] = useState(false);
@@ -399,6 +426,12 @@ function TagsSection({ clientId, client }: { clientId: number; client?: Client }
   );
 }
 
+/**
+ * Editable market keywords section for a client's market positioning.
+ * Keywords are used for hashtag suggestions and trend tracking.
+ * @param clientId - The client's ID
+ * @param client - The client object with current market tags
+ */
 function MarketTagsSection({ clientId, client }: { clientId: number; client?: Client }) {
   const { toast } = useToast();
   const [editing, setEditing] = useState(false);
@@ -495,6 +528,19 @@ function MarketTagsSection({ clientId, client }: { clientId: number; client?: Cl
   );
 }
 
+/**
+ * Generic CRUD section component for managing a list of items (products, services, etc.).
+ * Provides add, edit, and delete functionality with configurable fields and rendering.
+ * @template T - The item type (must have an `id` property)
+ * @param title - Section title displayed in the header
+ * @param icon - Lucide icon component for the section header
+ * @param items - Array of existing items
+ * @param clientId - The client's ID
+ * @param baseUrl - API base URL for CRUD operations
+ * @param queryKey - TanStack Query key for cache invalidation
+ * @param fields - Field definitions for the add/edit form
+ * @param renderItem - Render function for each item with delete and edit callbacks
+ */
 function CrudSection<T extends { id: number }>({
   title,
   icon: Icon,
@@ -628,6 +674,11 @@ function CrudSection<T extends { id: number }>({
   );
 }
 
+/**
+ * Products management section using the generic CrudSection component.
+ * @param clientId - The client's ID
+ * @param products - Array of the client's products
+ */
 function ProductsSection({ clientId, products }: { clientId: number; products: ClientProduct[] }) {
   return (
     <CrudSection
@@ -661,6 +712,11 @@ function ProductsSection({ clientId, products }: { clientId: number; products: C
   );
 }
 
+/**
+ * Services management section using the generic CrudSection component.
+ * @param clientId - The client's ID
+ * @param services - Array of the client's services
+ */
 function ServicesSection({ clientId, services }: { clientId: number; services: ClientService[] }) {
   return (
     <CrudSection
@@ -694,6 +750,12 @@ function ServicesSection({ clientId, services }: { clientId: number; services: C
   );
 }
 
+/**
+ * Social media credentials management section with password visibility toggle.
+ * Allows adding, editing, and deleting credentials for various platforms.
+ * @param clientId - The client's ID
+ * @param credentials - Array of the client's social media credentials
+ */
 function CredentialsSection({ clientId, credentials }: { clientId: number; credentials: ClientCredential[] }) {
   const { toast } = useToast();
   const [adding, setAdding] = useState(false);
@@ -819,6 +881,12 @@ function CredentialsSection({ clientId, credentials }: { clientId: number; crede
   );
 }
 
+/**
+ * Competitors management section for tracking a client's market competitors.
+ * Supports adding/editing competitor profiles with social media links and notes.
+ * @param clientId - The client's ID
+ * @param competitors - Array of competitors associated with this client
+ */
 function CompetitorsSection({ clientId, competitors }: { clientId: number; competitors: Competitor[] }) {
   const { toast } = useToast();
   const [showForm, setShowForm] = useState(false);
@@ -1026,6 +1094,13 @@ function CompetitorsSection({ clientId, competitors }: { clientId: number; compe
   );
 }
 
+/**
+ * Access control section for managing which users can view/manage a client.
+ * Admin-only: allows selecting specific users who have access to this client.
+ * @param clientId - The client's ID
+ * @param users - Array of all system users
+ * @param accessUserIds - Array of user IDs that currently have access
+ */
 function AccessSection({ clientId, users, accessUserIds }: { clientId: number; users: User[]; accessUserIds: number[] }) {
   const { toast } = useToast();
   const [selected, setSelected] = useState<number[]>(accessUserIds);
@@ -1107,6 +1182,7 @@ function AccessSection({ clientId, users, accessUserIds }: { clientId: number; u
   );
 }
 
+/** Data structure for a reusable text template associated with a client */
 interface ClientTextTemplate {
   id: number;
   clientId: number;
@@ -1115,6 +1191,12 @@ interface ClientTextTemplate {
   createdAt: string;
 }
 
+/**
+ * Kanban settings section for configuring optional columns (Reunião, Captação)
+ * and managing reusable text templates for card content.
+ * @param clientId - The client's ID
+ * @param client - The client object with current kanban settings
+ */
 function KanbanSettingsSection({ clientId, client }: { clientId: number; client?: Client }) {
   const { toast } = useToast();
   const [editingTemplate, setEditingTemplate] = useState<ClientTextTemplate | null>(null);
@@ -1293,6 +1375,7 @@ function KanbanSettingsSection({ clientId, client }: { clientId: number; client?
   );
 }
 
+/** Data structure for a brand identity file stored in Google Drive */
 interface BrandIdentityFileData {
   id: number;
   clientId: number;
@@ -1306,6 +1389,12 @@ interface BrandIdentityFileData {
   createdAt: string;
 }
 
+/**
+ * Brand identity file management section for uploading, categorizing, and downloading
+ * visual identity files (logos, typography, color palettes, manuals, etc.).
+ * Files are stored via Google Drive integration.
+ * @param clientId - The client's ID
+ */
 function BrandIdentitySection({ clientId }: { clientId: number }) {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -1496,6 +1585,7 @@ function BrandIdentitySection({ clientId }: { clientId: number }) {
   );
 }
 
+/** Available icon options for custom links on the client's link page */
 const LINK_ICON_OPTIONS = [
   { value: "link", label: "Link" },
   { value: "shopping-bag", label: "Loja" },
@@ -1514,6 +1604,7 @@ const LINK_ICON_OPTIONS = [
   { value: "utensils", label: "Cardápio" },
 ];
 
+/** Data structure for a custom link on the client's link page */
 interface CustomLinkItem {
   id?: number;
   name: string;
@@ -1521,6 +1612,13 @@ interface CustomLinkItem {
   icon: string;
 }
 
+/**
+ * Link Page configuration section for managing the client's public "link in bio" page.
+ * Supports editing bio, social links, colors, theme, visibility toggles, slug,
+ * and custom links. Generates a shareable URL at /link/{slug}.
+ * @param clientId - The client's ID
+ * @param client - The client object with current link page settings
+ */
 function LinkPageSection({ clientId, client }: { clientId: number; client?: Client }) {
   const { toast } = useToast();
   const { user } = useAuth();

@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Settings, HardDrive, CheckCircle2, XCircle, Loader2, Eye, EyeOff, Trash2, ExternalLink, Upload, Image, Palette, Building2, Sparkles, X } from "lucide-react";
 import { Redirect } from "wouter";
 
+/** Shape of the system branding configuration data */
 type BrandingData = {
   systemName: string;
   systemLogo: string;
@@ -19,6 +20,11 @@ type BrandingData = {
   systemTheme: string;
 };
 
+/**
+ * SettingsPage - Admin-only settings page for system configuration.
+ * Manages branding (system name, logo, favicon), theme selection, and Google Drive OAuth2 credentials.
+ * Only accessible to users with the "admin" role.
+ */
 export default function SettingsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -110,6 +116,7 @@ export default function SettingsPage() {
     return <Redirect to="/" />;
   }
 
+  /** Handles Google Drive credentials form submission */
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.googleClientId || !form.googleClientSecret || !form.googleRefreshToken) {
@@ -119,15 +126,18 @@ export default function SettingsPage() {
     saveMutation.mutate(form);
   };
 
+  /** Saves the system name branding configuration */
   const handleSaveBranding = () => {
     brandingMutation.mutate({ systemName });
   };
 
+  /** Updates the system color theme and persists the selection */
   const handleSelectTheme = (theme: "classic" | "business" | "creative") => {
     setBrandTheme(theme);
     brandingMutation.mutate({ systemTheme: theme });
   };
 
+  /** Uploads a logo or favicon image file to the server */
   const handleUpload = async (type: "logo" | "favicon", file: File) => {
     if (type === "logo") setUploadingLogo(true);
     else setUploadingFavicon(true);

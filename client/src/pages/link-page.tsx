@@ -1,3 +1,9 @@
+/**
+ * @module link-page
+ * Public "link in bio" page for clients.
+ * Renders a branded landing page with the client's logo, bio, social links,
+ * custom links, and an optional dark/light mode toggle. Accessible via `/link/:slug`.
+ */
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "wouter";
@@ -10,6 +16,7 @@ import {
 import { SiInstagram, SiFacebook, SiTiktok, SiLinkedin, SiYoutube, SiWhatsapp } from "react-icons/si";
 import { RichTextDisplay } from "@/components/rich-text-editor";
 
+/** Maps icon key strings to their Lucide icon components for custom link rendering. */
 const ICON_MAP: Record<string, any> = {
   link: LinkIcon,
   "shopping-bag": ShoppingBag,
@@ -28,12 +35,14 @@ const ICON_MAP: Record<string, any> = {
   utensils: UtensilsCrossed,
 };
 
+/** A single custom link entry on the link page. */
 interface CustomLink {
   name: string;
   url: string;
   icon: string;
 }
 
+/** Full data model for a client's public link page returned by the API. */
 interface LinkPageData {
   name: string;
   bio: string | null;

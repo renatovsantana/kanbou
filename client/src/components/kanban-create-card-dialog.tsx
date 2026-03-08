@@ -1,3 +1,10 @@
+/**
+ * @module kanban-create-card-dialog
+ * Dialog component for creating a new Kanban card.
+ * Provides a two-step flow: first select a card type (post, video, copy, etc.),
+ * then fill in type-specific template fields (title, platform, caption, dimensions, etc.)
+ * before submitting the card to a selected column.
+ */
 import { useState } from "react";
 import {
   CARD_TYPES,
@@ -33,6 +40,7 @@ import {
 import { TextareaWithExtras } from "@/components/rich-text-editor";
 import { useQuery } from "@tanstack/react-query";
 
+/** Maps each card type to its representative Lucide icon component. */
 const CARD_TYPE_ICONS: Record<CardType, React.ComponentType<{ className?: string }>> = {
   geral: LayoutGrid,
   post: Image,
@@ -46,6 +54,7 @@ const CARD_TYPE_ICONS: Record<CardType, React.ComponentType<{ className?: string
   captacao: Camera,
 };
 
+/** Props for the {@link KanbanCreateCardDialog} component. */
 interface KanbanCreateCardDialogProps {
   open: boolean;
   onClose: () => void;

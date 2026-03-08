@@ -1,3 +1,9 @@
+/**
+ * @module users
+ * User management page.
+ * Lists all system users in a table, supports creating, editing, and deleting users
+ * with role-based permission management. Only accessible to admin users.
+ */
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth";
@@ -33,6 +39,7 @@ import { Plus, UserCog, Loader2, Edit, Trash2 } from "lucide-react";
 import type { Client } from "@shared/schema";
 import { AVAILABLE_PERMISSIONS, DEFAULT_PERMISSIONS, ROLE_LABELS, ALL_ROLES, isInternalRole } from "@shared/schema";
 
+/** Safe user representation (excludes password hash). */
 type SafeUser = {
   id: number;
   name: string;
@@ -44,6 +51,11 @@ type SafeUser = {
   createdAt: string | null;
 };
 
+/**
+ * Admin page for managing system users.
+ * Features: user list with search, create/edit dialog, role and permission assignment,
+ * client association, and user deletion with confirmation.
+ */
 export default function UsersPage() {
   const { user: currentUser } = useAuth();
   const { toast } = useToast();

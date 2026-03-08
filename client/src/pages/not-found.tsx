@@ -1,6 +1,13 @@
+/**
+ * @module not-found
+ * 404 fallback page displayed when no route matches the current URL.
+ */
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertCircle } from "lucide-react";
 
+/**
+ * Renders a centred card with a 404 message and an alert icon.
+ */
 export default function NotFound() {
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-gray-50">

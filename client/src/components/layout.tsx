@@ -1,3 +1,9 @@
+/**
+ * @module layout
+ * Application shell layout component.
+ * Provides the sidebar navigation, top header with breadcrumbs and notifications,
+ * error-reporting dialog, and a mobile-responsive drawer menu.
+ */
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard,

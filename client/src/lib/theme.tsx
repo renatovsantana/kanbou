@@ -1,9 +1,18 @@
+/**
+ * @module theme
+ * Theme context, provider, and hook for managing dark/light mode and brand themes.
+ * Persists choices to localStorage and syncs with a server-side branding setting.
+ */
 import { createContext, useContext, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
+/** Available colour-scheme modes. */
 type Theme = "dark" | "light";
+
+/** Available brand colour presets. */
 type BrandTheme = "classic" | "business" | "creative";
 
+/** Contract exposed by the theme context to consuming components. */
 interface ThemeContextType {
   theme: Theme;
   brandTheme: BrandTheme;
@@ -14,6 +23,17 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
+/**
+ * Provides dark/light and brand-theme state to the component tree.
+ *
+ * - Reads initial values from `localStorage` (keys `shift-theme`, `shift-brand-theme`).
+ * - Fetches the server-side branding preference from `/api/settings/branding` and
+ *   syncs the brand theme when the server value changes.
+ * - Toggles the `dark` class on `document.documentElement` for Tailwind dark-mode.
+ * - Sets a `data-theme` attribute on the root element for brand-theme CSS switching.
+ *
+ * @param children - React child nodes to render within the provider.
+ */
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => {
     if (typeof window !== "undefined") {
@@ -83,6 +103,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * Convenience hook to access the current theme context.
+ *
+ * @returns The `ThemeContextType` containing the current theme, brand theme, and setter functions.
+ * @throws {Error} If called outside of a `ThemeProvider`.
+ */
 export function useTheme() {
   const context = useContext(ThemeContext);
   if (!context) {

@@ -30,8 +30,14 @@ import {
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
+/** Filter options for the client approval status filter */
 type ApprovalFilter = "all" | "Pendente" | "Aprovado" | "Reprovado" | "Revisão";
 
+/**
+ * ClientApprovals - Client-facing approval page for reviewing Kanban card materials.
+ * Clients can approve, request revision, or reject materials sent for their approval.
+ * Cards are grouped by type with status filtering and detailed preview modals.
+ */
 export default function ClientApprovals() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -112,6 +118,7 @@ export default function ClientApprovals() {
     },
   });
 
+  /** Filters cards by the active status and type filters */
   const filteredCards = useMemo(() => {
     return cards.filter(c => {
       if (filterStatus !== "all" && c.approvalStatus !== filterStatus) return false;
@@ -120,6 +127,7 @@ export default function ClientApprovals() {
     });
   }, [cards, filterStatus, filterType]);
 
+  /** Groups filtered cards by their card type for section rendering */
   const groupedByType = useMemo(() => {
     const groups: Record<string, KanbanCard[]> = {};
     for (const card of filteredCards) {
@@ -130,6 +138,7 @@ export default function ClientApprovals() {
     return groups;
   }, [filteredCards]);
 
+  /** Computes counts for each approval status across all cards */
   const statusCounts = useMemo(() => {
     const counts = { all: cards.length, Pendente: 0, Aprovado: 0, Reprovado: 0, "Revisão": 0 };
     for (const c of cards) {
@@ -140,6 +149,7 @@ export default function ClientApprovals() {
     return counts;
   }, [cards]);
 
+  /** Returns a styled status badge component for the given approval status */
   const getStatusBadge = (status: string | null) => {
     switch (status) {
       case "Pendente":
@@ -171,6 +181,7 @@ export default function ClientApprovals() {
     }
   };
 
+  /** Parses the JSON attachments field of a Kanban card into a typed array */
   const getAttachments = (card: KanbanCard) => {
     if (!card.attachments) return [];
     try {
@@ -190,6 +201,7 @@ export default function ClientApprovals() {
     }
   };
 
+  /** Parses the JSON templateData field of a Kanban card into a key-value record */
   const getTemplateData = (card: KanbanCard) => {
     if (!card.templateData) return {};
     try {

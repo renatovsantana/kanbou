@@ -40,6 +40,7 @@ import {
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
+/** Insight record enriched with user and client display names */
 interface EnrichedInsight {
   id: number;
   clientId: number;
@@ -50,6 +51,11 @@ interface EnrichedInsight {
   createdAt: string;
 }
 
+/**
+ * InsightsPage - Collaborative insights/ideas board for internal users and clients.
+ * Internal users can filter by client and publish insights; clients see insights for their own account.
+ * Features a rich text composer, date-grouped timeline, delete confirmation, and publish confirmation dialogs.
+ */
 export default function InsightsPage() {
   const { toast } = useToast();
   const { user } = useAuth();

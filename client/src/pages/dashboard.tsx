@@ -49,6 +49,7 @@ import { CARD_TYPE_LABELS, CARD_TYPE_COLORS } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 
+/** Summary data structure for client-role dashboard showing material counts by status */
 interface ClientSummary {
   columns: { id: number; title: string; count: number }[];
   recentCards: { id: number; title: string; cardType: string; columnTitle: string; updatedAt: string }[];
@@ -63,6 +64,7 @@ interface ClientSummary {
   inProgress: number;
 }
 
+/** Overview insights data including approval rates, monthly trends, and platform breakdown */
 interface InsightsData {
   approvalRate: number;
   totalPosts: number;
@@ -73,6 +75,7 @@ interface InsightsData {
   statusBreakdown: Record<string, number>;
 }
 
+/** Predefined hashtag categories with popular tags organized by industry/topic */
 const HASHTAG_CATEGORIES: Record<string, { label: string; tags: string[] }> = {
   moda: {
     label: "Moda & Beleza",
@@ -100,6 +103,13 @@ const HASHTAG_CATEGORIES: Record<string, { label: string; tags: string[] }> = {
   },
 };
 
+/**
+ * Main Dashboard page component.
+ * Renders a role-aware dashboard: clients see their material status summary,
+ * while admins/designers see agency-wide metrics including post statistics,
+ * approval rates, monthly activity charts, platform breakdown, recent posts/approvals,
+ * Instagram feeds, competitors, and hashtag suggestions.
+ */
 export default function Dashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -173,6 +183,10 @@ export default function Dashboard() {
     { label: "Clientes Ativos", value: activeClients, icon: Users, accent: false },
   ];
 
+  /**
+   * Renders an icon representing the approval status (approved, revision, or pending).
+   * @param status - The approval status string
+   */
   function ApprovalStatusIcon({ status }: { status: string }) {
     switch (status) {
       case "Aprovado":
@@ -195,6 +209,10 @@ export default function Dashboard() {
 
   const clientsWithInstagram = clientsList.filter(c => c.instagram);
 
+  /**
+   * Copies an array of hashtags to the clipboard and shows a toast notification.
+   * @param tags - Array of hashtag strings to copy
+   */
   function copyHashtags(tags: string[]) {
     navigator.clipboard.writeText(tags.join(" "));
     toast({ title: "Hashtags copiadas!", description: "Cole onde preferir." });

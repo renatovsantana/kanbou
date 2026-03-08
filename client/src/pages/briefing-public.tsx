@@ -13,6 +13,7 @@ import { CheckCircle2, ChevronLeft, ChevronRight, Send, FileText, Loader2, Uploa
 import { BRIEFING_QUESTIONS, type BriefingQuestion } from "./briefings";
 import type { BriefingTemplateQuestion } from "@shared/schema";
 
+/** Shape of the briefing data returned from the public API endpoint */
 type BriefingData = {
   id: number;
   title: string;
@@ -24,8 +25,15 @@ type BriefingData = {
   answers?: string | null;
 };
 
+/** Maximum allowed image file size for briefing uploads (2MB) */
 const MAX_IMAGE_SIZE = 2 * 1024 * 1024;
 
+/**
+ * BriefingPublicPage - Public-facing page where clients fill out briefing questionnaires.
+ * Accessed via a unique token URL without authentication.
+ * Supports both standard brand briefings (multi-phase wizard) and custom template-based briefings.
+ * Handles form validation, image/file uploads, and submission.
+ */
 export default function BriefingPublicPage() {
   const [, params] = useRoute("/briefing/:token");
   const token = params?.token || "";
@@ -84,6 +92,7 @@ export default function BriefingPublicPage() {
       .finally(() => setLoading(false));
   }, [token]);
 
+  /** Validates all required questions in a given phase, setting error messages for incomplete fields */
   const validatePhase = (phaseIndex: number): boolean => {
     const phase = BRIEFING_QUESTIONS[phaseIndex];
     const errors: Record<string, string> = {};
@@ -133,6 +142,7 @@ export default function BriefingPublicPage() {
     return Object.keys(errors).length === 0;
   };
 
+  /** Advances to the next phase after validating the current one */
   const handleNextPhase = () => {
     if (validatePhase(currentPhase)) {
       setCurrentPhase(p => Math.min(BRIEFING_QUESTIONS.length - 1, p + 1));
@@ -141,6 +151,7 @@ export default function BriefingPublicPage() {
     }
   };
 
+  /** Submits the completed standard briefing answers to the server */
   const handleSubmit = async () => {
     if (!validatePhase(currentPhase)) {
       toast({ title: "Preencha todos os campos obrigatórios", variant: "destructive" });
@@ -166,6 +177,7 @@ export default function BriefingPublicPage() {
     }
   };
 
+  /** Updates an answer value and clears its validation error */
   const setAnswer = (id: string, value: any) => {
     setAnswers(prev => ({ ...prev, [id]: value }));
     setValidationErrors(prev => {
@@ -175,6 +187,7 @@ export default function BriefingPublicPage() {
     });
   };
 
+  /** Toggles an option in a multi-select answer (adds if not present, removes if present) */
   const toggleMultiSelect = (id: string, option: string) => {
     setAnswers(prev => {
       const current = prev[id] || [];
@@ -190,6 +203,7 @@ export default function BriefingPublicPage() {
     });
   };
 
+  /** Uploads one or more images for a question, enforcing size and count limits */
   const handleImageUpload = async (questionId: string, files: FileList | null) => {
     if (!files || files.length === 0) return;
 
@@ -243,6 +257,7 @@ export default function BriefingPublicPage() {
     }
   };
 
+  /** Removes an uploaded image from a question's answer list by index */
   const removeImage = (questionId: string, index: number) => {
     const current = answers[questionId] || [];
     setAnswer(questionId, current.filter((_: any, i: number) => i !== index));
@@ -290,6 +305,7 @@ export default function BriefingPublicPage() {
     );
   }
 
+  /** Uploads a single file for a custom template question (max 10MB) */
   const handleCustomFileUpload = async (questionId: string, files: FileList | null) => {
     if (!files || files.length === 0) return;
     const file = files[0];
@@ -317,6 +333,7 @@ export default function BriefingPublicPage() {
     }
   };
 
+  /** Validates all required custom template questions, returning true if all are filled */
   const validateCustomQuestions = (): boolean => {
     const errors: Record<string, string> = {};
     for (const q of templateQuestions) {
@@ -340,6 +357,7 @@ export default function BriefingPublicPage() {
     return Object.keys(errors).length === 0;
   };
 
+  /** Submits the completed custom briefing answers to the server */
   const handleCustomSubmit = async () => {
     if (!validateCustomQuestions()) {
       toast({ title: "Preencha todos os campos obrigatórios", variant: "destructive" });
@@ -484,6 +502,7 @@ export default function BriefingPublicPage() {
     return answers[q.conditionalOn.questionId] === q.conditionalOn.value;
   });
 
+  /** Renders a single briefing question card with the appropriate input type and validation state */
   const renderQuestion = (q: BriefingQuestion, idx: number) => {
     const hasError = !!validationErrors[q.id];
 
@@ -677,6 +696,12 @@ export default function BriefingPublicPage() {
   );
 }
 
+/**
+ * ColorPickerField - Allows selection of up to 3 brand colors via native color inputs with hex code display.
+ * @param value - Array of up to 3 hex color strings
+ * @param onChange - Callback when colors change
+ * @param hasError - Whether to show error styling
+ */
 function ColorPickerField({ value, onChange, hasError }: { value: string[]; onChange: (colors: string[]) => void; hasError: boolean }) {
   const colors = [value[0] || "", value[1] || "", value[2] || ""];
 
@@ -731,6 +756,10 @@ function ColorPickerField({ value, onChange, hasError }: { value: string[]; onCh
   );
 }
 
+/**
+ * CustomFileUploadField - File upload component for custom briefing questions.
+ * Shows the uploaded file name when present, or an upload button when empty.
+ */
 function CustomFileUploadField({ value, onUpload, onRemove, uploading, hasError }: {
   value: { fileName: string; fileUrl: string } | null;
   onUpload: (files: FileList | null) => void;
@@ -781,6 +810,10 @@ function CustomFileUploadField({ value, onUpload, onRemove, uploading, hasError 
   );
 }
 
+/**
+ * ImageUploadField - Multi-image upload component for briefing questions.
+ * Displays uploaded image previews with remove buttons and enforces a 5-image limit.
+ */
 function ImageUploadField({ value, onUpload, onRemove, uploading, hasError }: {
   value: string[];
   onUpload: (files: FileList | null) => void;

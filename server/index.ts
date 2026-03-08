@@ -1,3 +1,10 @@
+/**
+ * @module server/index
+ * Ponto de entrada principal do servidor Express.
+ * Configura middlewares de segurança, parsing de body, sessão PostgreSQL,
+ * logging de requisições e inicializa rotas e servimento estático.
+ */
+
 import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
@@ -6,17 +13,27 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 
+/** Instância principal do Express */
 const app = express();
+/** Servidor HTTP wrapping o Express (necessário para WebSocket/SSE) */
 const httpServer = createServer(app);
 
 declare module "http" {
   interface IncomingMessage {
+    /** Body cru da requisição, preservado antes do parsing JSON */
     rawBody: unknown;
   }
 }
 
 app.set("trust proxy", 1);
 
+/**
+ * Middleware de segurança: configura headers HTTP de proteção.
+ * - X-Content-Type-Options: previne MIME sniffing
+ * - X-Frame-Options: previne clickjacking
+ * - X-XSS-Protection: proteção contra XSS
+ * - Referrer-Policy: controla informações de referrer
+ */
 app.use((_req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
@@ -26,6 +43,10 @@ app.use((_req, res, next) => {
   next();
 });
 
+/**
+ * Middleware de parsing JSON com limite de 10MB.
+ * Preserva o body cru em `req.rawBody` para uso posterior.
+ */
 app.use(
   express.json({
     limit: "10mb",
@@ -37,6 +58,12 @@ app.use(
 
 app.use(express.urlencoded({ extended: false, limit: "10mb" }));
 
+/**
+ * Configuração de sessão com armazenamento em PostgreSQL.
+ * - Sessões persistem por 30 dias
+ * - Cookie httpOnly e sameSite lax para segurança
+ * - Modo secure configurável via FORCE_HTTPS
+ */
 const PgSession = connectPgSimple(session);
 app.use(
   session({
@@ -56,6 +83,11 @@ app.use(
   }),
 );
 
+/**
+ * Registra uma mensagem no console com timestamp formatado.
+ * @param message - Mensagem a ser logada
+ * @param source - Origem do log (padrão: "express")
+ */
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
@@ -67,6 +99,11 @@ export function log(message: string, source = "express") {
   console.log(`${formattedTime} [${source}] ${message}`);
 }
 
+/**
+ * Middleware de logging de requisições API.
+ * Intercepta respostas JSON e registra método, path, status code,
+ * duração e body da resposta para rotas /api.
+ */
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -93,6 +130,13 @@ app.use((req, res, next) => {
   next();
 });
 
+/**
+ * IIFE assíncrona que inicializa o servidor:
+ * 1. Registra todas as rotas da API
+ * 2. Configura handler global de erros
+ * 3. Configura Vite (dev) ou arquivos estáticos (produção)
+ * 4. Inicia o servidor na porta configurada
+ */
 (async () => {
   await registerRoutes(httpServer, app);
 
@@ -109,9 +153,6 @@ app.use((req, res, next) => {
     return res.status(status).json({ message });
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
   if (process.env.NODE_ENV === "production") {
     serveStatic(app);
   } else {
@@ -119,10 +160,6 @@ app.use((req, res, next) => {
     await setupVite(httpServer, app);
   }
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || "5000", 10);
   httpServer.listen(
     {

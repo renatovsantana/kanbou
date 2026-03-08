@@ -1,3 +1,9 @@
+/**
+ * @module client-form
+ * Reusable form component for creating or editing a client.
+ * Validates input against the shared Drizzle/Zod insert schema and supports
+ * logo upload with image cropping.
+ */
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertClientSchema, type InsertClient, type Client } from "@shared/schema";
@@ -19,12 +25,21 @@ import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { ImageCropper } from "@/components/image-cropper";
 
+/** Props for the {@link ClientForm} component. */
 interface ClientFormProps {
   client?: Client;
   onSuccess?: () => void;
   onCancel?: () => void;
 }
 
+/**
+ * Form component for creating or editing a client record.
+ * Uses react-hook-form with Zod validation and supports inline logo upload + cropping.
+ *
+ * @param client - When provided, puts the form into edit mode with pre-populated values.
+ * @param onSuccess - Callback invoked after a successful create or update.
+ * @param onCancel - Callback invoked when the user cancels the form.
+ */
 export function ClientForm({ client, onSuccess, onCancel }: ClientFormProps) {
   const createClient = useCreateClient();
   const updateClient = useUpdateClient();

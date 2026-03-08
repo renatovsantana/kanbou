@@ -1,8 +1,14 @@
+/**
+ * @module auth
+ * Authentication context, provider, and hook for the client application.
+ * Manages user session state via TanStack Query and provides `login`/`logout` helpers.
+ */
 import { createContext, useContext, ReactNode } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient, getQueryFn } from "./queryClient";
 import { useLocation } from "wouter";
 
+/** Shape of the authenticated user object returned by the `/api/auth/me` endpoint. */
 type User = {
   id: number;
   name: string;
@@ -14,6 +20,7 @@ type User = {
   createdAt: string | null;
 };
 
+/** Contract exposed by the authentication context to consuming components. */
 type AuthContextType = {
   user: User | null;
   isLoading: boolean;
@@ -23,6 +30,13 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+/**
+ * Provides authentication state to the component tree.
+ * Fetches the current user on mount via `/api/auth/me` (returns `null` on 401).
+ * Exposes `login` and `logout` mutations that automatically invalidate the user query.
+ *
+ * @param children - React child nodes to render within the provider.
+ */
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [, setLocation] = useLocation();
 
@@ -69,6 +83,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * Convenience hook to access the current authentication context.
+ *
+ * @returns The `AuthContextType` containing the current `user`, `isLoading`, `login`, and `logout`.
+ * @throws {Error} If called outside of an `AuthProvider`.
+ */
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {

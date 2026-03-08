@@ -1,3 +1,9 @@
+/**
+ * @module error-reports
+ * Error-reports page for tracking and resolving application bugs.
+ * Users can submit new error reports with severity and type classifications,
+ * and admins can update status or mark them as resolved.
+ */
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -14,6 +20,7 @@ import { AlertTriangle, Bug, CheckCircle, Clock, Plus, MessageSquare, XCircle } 
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
+/** Shape of an error report record from the API. */
 interface ErrorReport {
   id: number;
   reporterUserId: number | null;
@@ -31,6 +38,7 @@ interface ErrorReport {
   createdAt: string;
 }
 
+/** Badge variant and label mapping for each severity level. */
 const SEVERITY_CONFIG: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   low: { label: "Baixa", variant: "secondary" },
   medium: { label: "Média", variant: "default" },
@@ -38,6 +46,7 @@ const SEVERITY_CONFIG: Record<string, { label: string; variant: "default" | "sec
   critical: { label: "Crítica", variant: "destructive" },
 };
 
+/** Icon and label mapping for each error-report status. */
 const STATUS_CONFIG: Record<string, { label: string; icon: any }> = {
   aberto: { label: "Aberto", icon: AlertTriangle },
   em_andamento: { label: "Em Andamento", icon: Clock },
@@ -45,6 +54,10 @@ const STATUS_CONFIG: Record<string, { label: string; icon: any }> = {
   ignorado: { label: "Ignorado", icon: XCircle },
 };
 
+/**
+ * Page component for viewing, creating, and managing error reports.
+ * Displays a filterable list of reports with severity badges and status icons.
+ */
 export default function ErrorReportsPage() {
   const { user } = useAuth();
   const { toast } = useToast();

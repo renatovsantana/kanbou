@@ -1,3 +1,9 @@
+/**
+ * @module documentacao
+ * Documentation viewer page.
+ * Fetches a Markdown file from the API, parses it into HTML with a table of contents,
+ * and renders a side-navigation + scrollable content layout with search highlighting.
+ */
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Book, ChevronRight, Search, ArrowUp } from "lucide-react";
@@ -6,12 +12,20 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
+/** Represents a single heading entry in the auto-generated table of contents. */
 interface TocItem {
   id: string;
   title: string;
   level: number;
 }
 
+/**
+ * Converts a Markdown string into styled HTML.
+ * Handles headings, bold/italic, code blocks, tables, lists, and horizontal rules.
+ *
+ * @param md - Raw Markdown content.
+ * @returns An HTML string with Tailwind utility classes applied.
+ */
 function parseMarkdown(md: string): string {
   let html = md;
 

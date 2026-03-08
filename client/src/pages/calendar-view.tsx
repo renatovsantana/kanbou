@@ -1,3 +1,9 @@
+/**
+ * @module calendar-view
+ * Calendar page for visualising scheduled posts and kanban cards.
+ * Renders a calendar with day-indicators and a detail panel for the selected date,
+ * plus a list view of all upcoming items with platform/status filters.
+ */
 import { usePosts } from "@/hooks/use-posts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
@@ -16,6 +22,7 @@ import { CalendarDays, Filter, ListFilter, Clock, Kanban, RefreshCw } from "luci
 import { queryClient } from "@/lib/queryClient";
 import type { Client } from "@shared/schema";
 
+/** Unified item shape combining posts and kanban cards for calendar display. */
 interface CalendarItem {
   id: string | number;
   title: string;
@@ -30,6 +37,11 @@ interface CalendarItem {
   cardType?: string;
 }
 
+/**
+ * Calendar page component.
+ * Merges posts and scheduled kanban cards into a unified calendar view with
+ * date selection, platform/client/status filters, and a list tab for upcoming items.
+ */
 export default function CalendarView() {
   const { user } = useAuth();
   const [date, setDate] = useState<Date | undefined>(new Date());

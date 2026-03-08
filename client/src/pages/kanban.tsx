@@ -95,6 +95,7 @@ import { ptBR } from "date-fns/locale";
 import { useSearch } from "wouter";
 import { useSidebarCollapse } from "@/components/layout";
 
+/** Map of label color names to their corresponding Tailwind background classes */
 const LABEL_COLORS: Record<string, string> = {
   verde: "bg-emerald-500",
   amarelo: "bg-yellow-400",
@@ -104,6 +105,11 @@ const LABEL_COLORS: Record<string, string> = {
   azul: "bg-blue-500",
 };
 
+/**
+ * Formats a number of seconds into a human-readable elapsed time string (e.g. "2d 3h 15m").
+ * @param totalSec - Total elapsed seconds
+ * @returns Formatted time string with days, hours, minutes, and seconds
+ */
 function formatElapsed(totalSec: number): string {
   const d = Math.floor(totalSec / 86400);
   const h = Math.floor((totalSec % 86400) / 3600);
@@ -115,6 +121,13 @@ function formatElapsed(totalSec: number): string {
   return `${s}s`;
 }
 
+/**
+ * Custom hook that computes and live-updates elapsed time for a kanban card in a timed column.
+ * Combines previously accumulated seconds with real-time counting when the timer is active.
+ * @param accumulatedSeconds - Total seconds already accumulated before the current session
+ * @param openSince - ISO timestamp of when the timer started, or null if not currently active
+ * @returns Formatted elapsed time string that updates every second while active
+ */
 function useAccumulatedTimer(accumulatedSeconds: number, openSince: string | null) {
   const [elapsed, setElapsed] = useState("");
   useEffect(() => {
@@ -135,6 +148,7 @@ function useAccumulatedTimer(accumulatedSeconds: number, openSince: string | nul
   return elapsed;
 }
 
+/** Map of card types to their accent hex color for left border and type badge */
 const CARD_TYPE_ACCENT: Record<string, string> = {
   post: "#3b82f6",
   material_offline: "#f59e0b",
@@ -145,6 +159,16 @@ const CARD_TYPE_ACCENT: Record<string, string> = {
   geral: "#6b7280",
 };
 
+/**
+ * Draggable kanban card component that renders within a sortable context.
+ * Displays card title, labels, type badge, approval status, timer, due date,
+ * attachments count, assigned users, and an optional schedule button.
+ * @param card - The kanban card data
+ * @param onCardClick - Handler invoked on double-click to open card details
+ * @param columnTitle - Title of the parent column (used to show schedule button)
+ * @param onScheduleCard - Handler to trigger scheduling flow for this card
+ * @param columnTimeData - Accumulated time and active timer data for this card's column
+ */
 function SortableCard({
   card,
   onCardClick,
@@ -330,6 +354,11 @@ function SortableCard({
   );
 }
 
+/**
+ * Lightweight card preview component shown during drag operations as the DragOverlay.
+ * Displays a simplified, slightly rotated version of the card with labels, type accent, and title.
+ * @param card - The kanban card being dragged
+ */
 function CardPreview({ card }: { card: KanbanCard }) {
   const accentColor = CARD_TYPE_ACCENT[card.cardType as string] || CARD_TYPE_ACCENT.geral;
   return (
@@ -359,8 +388,15 @@ function CardPreview({ card }: { card: KanbanCard }) {
   );
 }
 
+/** Name of the column where overdue card detection is applied */
 const OVERDUE_COLUMN = "Agendamento";
 
+/**
+ * Determines whether a kanban card of type "post" has a publish date in the past.
+ * Only applies to post-type cards with a valid publishDate in templateData.
+ * @param card - The kanban card to check
+ * @returns True if the card's publish date is before today (local time)
+ */
 function isCardOverdue(card: KanbanCard): boolean {
   if (card.cardType !== "post") return false;
   try {
@@ -379,6 +415,20 @@ function isCardOverdue(card: KanbanCard): boolean {
   }
 }
 
+/**
+ * Droppable kanban column component that serves as a drop target for cards.
+ * Supports inline renaming, card creation, overdue card section (for "Agendamento" column),
+ * and column deletion via dropdown menu.
+ * @param column - The kanban column data
+ * @param cards - Array of cards belonging to this column
+ * @param onCardClick - Handler for opening a card's detail modal
+ * @param onAddCard - Handler for creating a new card in this column
+ * @param onRenameColumn - Handler for renaming this column
+ * @param onDeleteColumn - Handler for deleting this column
+ * @param onScheduleCard - Handler to trigger scheduling flow for a card
+ * @param columnTimesData - Timer data for all cards (keyed by card ID)
+ * @param clientId - The current client ID
+ */
 function DroppableColumn({
   column,
   cards,
@@ -556,6 +606,12 @@ function DroppableColumn({
   );
 }
 
+/**
+ * Dialog component for managing kanban column order, adding new columns, and deleting columns.
+ * Allows reordering columns via up/down arrows and saving the new order to the server.
+ * @param clientId - The client whose kanban columns are being managed
+ * @param columns - Current array of kanban columns
+ */
 function KanbanColumnManager({ clientId, columns }: { clientId: number; columns: KanbanColumn[] }) {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
@@ -727,6 +783,7 @@ function KanbanColumnManager({ clientId, columns }: { clientId: number; columns:
   );
 }
 
+/** Preset background color options for kanban board customization */
 const PRESET_COLORS = [
   "#1e293b", "#0f172a", "#1a1a2e", "#16213e", "#0d1b2a",
   "#1b4332", "#064e3b", "#14532d", "#365314", "#3f6212",
@@ -735,6 +792,11 @@ const PRESET_COLORS = [
   "#831843", "#9d174d", "#be185d", "#be123c", "#881337",
 ];
 
+/**
+ * Popover component for customizing the kanban board background.
+ * Supports selecting preset colors, custom color picker, and background image URL.
+ * @param client - The client whose kanban background settings are being edited
+ */
 function KanbanBgSettings({ client }: { client: Client }) {
   const { toast } = useToast();
   const [bgColor, setBgColor] = useState(client.kanbanBgColor || "");
@@ -843,6 +905,13 @@ function KanbanBgSettings({ client }: { client: Client }) {
   );
 }
 
+/**
+ * Scroll area wrapper for the kanban board with synchronized dual scrollbars.
+ * Provides a top scrollbar that mirrors the main horizontal scroll, and applies
+ * custom background color or image from client settings.
+ * @param children - The kanban board content to render inside the scroll area
+ * @param client - Optional client data for custom background styling
+ */
 function KanbanScrollArea({ children, client }: { children: React.ReactNode; client?: Client }) {
   const mainRef = useRef<HTMLDivElement>(null);
   const topBarRef = useRef<HTMLDivElement>(null);
@@ -914,6 +983,12 @@ function KanbanScrollArea({ children, client }: { children: React.ReactNode; cli
   );
 }
 
+/**
+ * Main Kanban board page component.
+ * Manages the full kanban experience: client selection, column/card CRUD operations,
+ * drag-and-drop reordering, approval flow confirmation dialogs, schedule confirmation,
+ * and card detail modal. Uses optimistic updates for card moves.
+ */
 export default function KanbanBoard() {
   const { toast } = useToast();
   const searchString = useSearch();

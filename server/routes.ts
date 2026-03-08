@@ -13,15 +13,22 @@ import sharp from "sharp";
 import * as fs from "fs";
 import * as path from "path";
 
+/** Multer instance configured with in-memory storage and 50MB file size limit */
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
+/** Directory path for storing generated thumbnails */
 const THUMBNAILS_DIR = path.join(process.cwd(), "server", "thumbnails");
 if (!fs.existsSync(THUMBNAILS_DIR)) fs.mkdirSync(THUMBNAILS_DIR, { recursive: true });
 
+/** In-memory store tracking failed login attempts per IP for rate limiting */
 const loginAttempts = new Map<string, { count: number; firstAttempt: number; blockedUntil: number }>();
+/** Maximum number of login attempts allowed within the rate limit window */
 const MAX_LOGIN_ATTEMPTS = 5;
+/** Rate limit window duration in milliseconds (15 minutes) */
 const WINDOW_MS = 15 * 60 * 1000;
+/** Duration an IP is blocked after exceeding max login attempts (15 minutes) */
 const BLOCK_DURATION_MS = 15 * 60 * 1000;
 
+/** Periodically cleans up expired login attempt records every 60 seconds */
 setInterval(() => {
   const now = Date.now();
   for (const [key, data] of loginAttempts.entries()) {
@@ -31,10 +38,21 @@ setInterval(() => {
   }
 }, 60 * 1000);
 
+/**
+ * Extracts the client IP address from the request.
+ * Checks x-forwarded-for header for proxied requests.
+ * @param req - Express request object
+ * @returns The client's IP address string
+ */
 function getClientIp(req: any): string {
   return req.ip || req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.connection?.remoteAddress || "unknown";
 }
 
+/**
+ * Checks whether a given IP is allowed to attempt login based on rate limiting rules.
+ * @param ip - The client IP address to check
+ * @returns Object with `allowed` flag and optional `retryAfter` seconds
+ */
 function checkLoginRateLimit(ip: string): { allowed: boolean; retryAfter?: number } {
   const now = Date.now();
   const data = loginAttempts.get(ip);
@@ -58,6 +76,11 @@ function checkLoginRateLimit(ip: string): { allowed: boolean; retryAfter?: numbe
   return { allowed: true };
 }
 
+/**
+ * Records a failed login attempt for the given IP address.
+ * Increments the attempt counter or initializes a new record.
+ * @param ip - The client IP address
+ */
 function recordFailedLogin(ip: string) {
   const now = Date.now();
   const data = loginAttempts.get(ip);
@@ -68,10 +91,23 @@ function recordFailedLogin(ip: string) {
   }
 }
 
+/**
+ * Clears all login attempt records for the given IP after a successful login.
+ * @param ip - The client IP address
+ */
 function clearLoginAttempts(ip: string) {
   loginAttempts.delete(ip);
 }
 
+/**
+ * Generates a WebP thumbnail from an image buffer and saves it to disk.
+ * @param buffer - The raw image buffer
+ * @param attachmentId - Unique identifier used as the thumbnail filename
+ * @param width - Maximum thumbnail width (default: 300)
+ * @param height - Maximum thumbnail height (default: 300)
+ * @param quality - WebP compression quality (default: 60)
+ * @returns The URL path to the generated thumbnail, or null on failure
+ */
 async function generateThumbnail(buffer: Buffer, attachmentId: string, width = 300, height = 300, quality = 60): Promise<string | null> {
   try {
     const thumbPath = path.join(THUMBNAILS_DIR, `${attachmentId}.webp`);
@@ -86,6 +122,14 @@ async function generateThumbnail(buffer: Buffer, attachmentId: string, width = 3
   }
 }
 
+/**
+ * Registers all API routes on the Express application.
+ * Includes auth, user management, clients, posts, approvals, kanban, notifications,
+ * briefings, settings, Google Drive integration, and file upload routes.
+ * @param httpServer - The HTTP server instance
+ * @param app - The Express application instance
+ * @returns The HTTP server instance
+ */
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -93,6 +137,7 @@ export async function registerRoutes(
 
   // === AUTH ROUTES ===
 
+  /** POST /api/auth/register - Registers a new user. Requires admin role. Validates input with registerSchema. */
   app.post("/api/auth/register", requireRole("admin"), async (req, res) => {
     try {
       const input = registerSchema.parse(req.body);
@@ -119,6 +164,7 @@ export async function registerRoutes(
     }
   });
 
+  /** POST /api/auth/login - Authenticates a user with email/password. Applies rate limiting per IP. */
   app.post("/api/auth/login", async (req, res) => {
     try {
       const ip = getClientIp(req);
@@ -157,6 +203,7 @@ export async function registerRoutes(
     }
   });
 
+  /** POST /api/auth/logout - Destroys the user session and clears the session cookie. */
   app.post("/api/auth/logout", (req, res) => {
     (req as any).session.destroy((err: any) => {
       if (err) {
@@ -167,6 +214,7 @@ export async function registerRoutes(
     });
   });
 
+  /** GET /api/auth/me - Returns the currently authenticated user (without password). */
   app.get("/api/auth/me", async (req, res) => {
     const user = await getCurrentUser(req);
     if (!user) {
@@ -178,6 +226,7 @@ export async function registerRoutes(
 
   // === USER MANAGEMENT (admin only) ===
 
+  /** GET /api/users - Lists all users. Requires auth + internal role or manager. Returns users without passwords. */
   app.get("/api/users", requireAuth, async (req, res) => {
     const user = await getCurrentUser(req);
     if (!user) return res.status(401).json({ message: "Não autenticado" });
@@ -189,6 +238,7 @@ export async function registerRoutes(
     res.json(safeUsers);
   });
 
+  /** POST /api/users - Creates a new user. Requires admin role. Hashes password before storing. */
   app.post("/api/users", requireRole("admin"), async (req, res) => {
     try {
       const input = registerSchema.parse(req.body);
@@ -216,6 +266,7 @@ export async function registerRoutes(
     }
   });
 
+  /** PUT /api/users/:id - Updates a user by ID. Requires admin role. Hashes password if provided. */
   app.put("/api/users/:id", requireRole("admin"), async (req, res) => {
     const id = Number(req.params.id);
     const existing = await storage.getUser(id);
@@ -233,6 +284,7 @@ export async function registerRoutes(
     res.json(safeUser);
   });
 
+  /** DELETE /api/users/:id - Deletes a user by ID. Requires admin role. Prevents self-deletion. */
   app.delete("/api/users/:id", requireRole("admin"), async (req, res) => {
     const id = Number(req.params.id);
     const existing = await storage.getUser(id);
@@ -249,6 +301,7 @@ export async function registerRoutes(
 
   // === USER-CLIENT ACCESS ROUTES ===
 
+  /** GET /api/users/:id/client-access - Returns list of client IDs a user has access to. Requires admin or manager. */
   app.get("/api/users/:id/client-access", requireAuth, async (req, res) => {
     const user = await getCurrentUser(req);
     if (!user) return res.status(401).json({ message: "Não autenticado" });
@@ -260,6 +313,7 @@ export async function registerRoutes(
     res.json(access.map(a => a.clientId));
   });
 
+  /** PUT /api/users/:id/client-access - Replaces user's client access list. Requires admin or manager. Body: { clientIds: number[] } */
   app.put("/api/users/:id/client-access", requireAuth, async (req, res) => {
     const user = await getCurrentUser(req);
     if (!user) return res.status(401).json({ message: "Não autenticado" });
@@ -280,6 +334,7 @@ export async function registerRoutes(
 
   // === CLIENT ROUTES ===
 
+  /** GET /api/clients - Lists clients. Filters by user role: clients see only their own, non-admin internal users see their allowed clients. */
   app.get(api.clients.list.path, requireAuth, async (req, res) => {
     const user = await getCurrentUser(req);
     let allClients = await storage.getClients();
@@ -299,6 +354,7 @@ export async function registerRoutes(
     res.json(allClients);
   });
 
+  /** GET /api/clients/:id - Returns a single client by ID. Client users can only access their own client. */
   app.get(api.clients.get.path, requireAuth, async (req, res) => {
     const id = Number(req.params.id);
     const user = await getCurrentUser(req);
@@ -312,6 +368,7 @@ export async function registerRoutes(
     res.json(client);
   });
 
+  /** POST /api/clients - Creates a new client with default kanban columns and a Google Drive folder. Requires admin role. */
   app.post(api.clients.create.path, requireRole("admin"), async (req, res) => {
     try {
       const input = api.clients.create.input.parse(req.body);
@@ -369,6 +426,7 @@ export async function registerRoutes(
     }
   });
 
+  /** DELETE /api/clients/:id - Deletes a client by ID. Requires admin role. Prevents deletion if client has linked posts. */
   app.delete(api.clients.delete.path, requireRole("admin"), async (req, res) => {
     const id = Number(req.params.id);
     const existing = await storage.getClient(id);
@@ -388,6 +446,7 @@ export async function registerRoutes(
 
   // === POST ROUTES ===
 
+  /** GET /api/posts - Lists posts. Client users see only their client's posts. Supports ?client=ID query filter. */
   app.get(api.posts.list.path, requireAuth, async (req, res) => {
     const user = await getCurrentUser(req);
     if (!user) return res.status(401).json({ message: "Não autenticado" });
@@ -415,6 +474,7 @@ export async function registerRoutes(
     res.json(post);
   });
 
+  /** POST /api/posts - Creates a new post. Requires internal role. Normalizes platform string to array. */
   app.post(api.posts.create.path, requireRole(...INTERNAL_ROLES), async (req, res) => {
     try {
       if (req.body.platform && typeof req.body.platform === 'string') {
@@ -434,6 +494,7 @@ export async function registerRoutes(
     }
   });
 
+  /** PUT /api/posts/:id - Updates an existing post by ID. Requires internal role. Normalizes platform string to array. */
   app.put(api.posts.update.path, requireRole(...INTERNAL_ROLES), async (req, res) => {
     try {
       const id = Number(req.params.id);
@@ -458,6 +519,7 @@ export async function registerRoutes(
     }
   });
 
+  /** DELETE /api/posts/:id - Deletes a post by ID. Requires admin role. */
   app.delete(api.posts.delete.path, requireRole("admin"), async (req, res) => {
     const id = Number(req.params.id);
     const existingPost = await storage.getPost(id);
@@ -530,6 +592,7 @@ export async function registerRoutes(
 
   // === APPROVAL POST ROUTES ===
 
+  /** GET /api/approvals - Lists approval posts. Filtered by role: clients see their own, designers see assigned, admins see all. */
   app.get(api.approvals.list.path, requireAuth, async (req, res) => {
     const user = await getCurrentUser(req);
     if (!user) return res.status(401).json({ message: "Não autenticado" });
@@ -545,6 +608,7 @@ export async function registerRoutes(
     res.json(approvals);
   });
 
+  /** GET /api/approvals/stats/by-client - Returns revision and pending counts grouped by client ID. Requires auth. */
   app.get("/api/approvals/stats/by-client", requireAuth, async (req, res) => {
     const allApprovals = await storage.getApprovalPosts();
     const stats: Record<number, { revisao: number; pendente: number }> = {};
@@ -558,12 +622,14 @@ export async function registerRoutes(
     res.json(stats);
   });
 
+  /** GET /api/approvals/approved - Returns all approval posts with status "Aprovado". Requires internal role. */
   app.get("/api/approvals/approved", requireRole(...INTERNAL_ROLES), async (_req, res) => {
     const allApprovals = await storage.getApprovalPosts();
     const approved = allApprovals.filter(a => a.status === "Aprovado");
     res.json(approved);
   });
 
+  /** GET /api/kanban/approved-cards - Returns approved kanban cards with template data, attachments, and scheduling status. Requires internal role. */
   app.get("/api/kanban/approved-cards", requireRole(...INTERNAL_ROLES), async (_req, res) => {
     try {
       const allCards = await storage.getApprovedKanbanCards();
@@ -612,6 +678,7 @@ export async function registerRoutes(
     }
   });
 
+  /** GET /api/approvals/:id - Returns a single approval post by ID. Requires auth. */
   app.get(api.approvals.get.path, requireAuth, async (req, res) => {
     const approval = await storage.getApprovalPost(Number(req.params.id));
     if (!approval) {
@@ -620,6 +687,7 @@ export async function registerRoutes(
     res.json(approval);
   });
 
+  /** POST /api/approvals - Creates a new approval post. Requires internal role. Uploads images to Google Drive and syncs to kanban. */
   app.post(api.approvals.create.path, requireRole(...INTERNAL_ROLES), async (req, res) => {
     try {
       const user = await getCurrentUser(req);
@@ -712,6 +780,7 @@ export async function registerRoutes(
     }
   });
 
+  /** PUT /api/approvals/:id - Updates an approval post. Client users can only update allowed fields (status, observations, etc.). Syncs status changes to kanban. */
   app.put(api.approvals.update.path, requireAuth, async (req, res) => {
     try {
       const id = Number(req.params.id);
@@ -783,6 +852,7 @@ export async function registerRoutes(
     }
   });
 
+  /** DELETE /api/approvals/:id - Deletes an approval post. Client users can only delete their own client's posts. */
   app.delete(api.approvals.delete.path, requireAuth, async (req, res) => {
     const id = Number(req.params.id);
     const existing = await storage.getApprovalPost(id);
@@ -801,6 +871,7 @@ export async function registerRoutes(
 
   // === IMPORT APPROVED POSTS TO SCHEDULING ===
 
+  /** POST /api/posts/import-approval - Imports an approved approval post as a scheduled post. Fetches Drive download URLs if available. Requires internal role. */
   app.post("/api/posts/import-approval", requireRole(...INTERNAL_ROLES), async (req, res) => {
     try {
       const importSchema = z.object({
@@ -860,6 +931,7 @@ export async function registerRoutes(
     }
   });
 
+  /** POST /api/posts/import-kanban-card - Imports an approved kanban card as a scheduled post and moves the card to "Agendados" column. Requires internal role. */
   app.post("/api/posts/import-kanban-card", requireRole(...INTERNAL_ROLES), async (req, res) => {
     try {
       const importSchema = z.object({
@@ -936,6 +1008,7 @@ export async function registerRoutes(
     }
   });
 
+  /** GET /api/kanban/scheduled-cards - Returns kanban cards in scheduled/posted columns with publish dates, excluding already-imported ones. Requires auth. */
   app.get("/api/kanban/scheduled-cards", requireAuth, async (req, res) => {
     try {
       const user = await getCurrentUser(req);
@@ -1000,6 +1073,7 @@ export async function registerRoutes(
 
   // === NOTIFICATIONS ROUTES ===
 
+  /** GET /api/notifications - Returns notifications filtered by user role and client. Requires auth. */
   app.get("/api/notifications", requireAuth, async (req, res) => {
     const user = await getCurrentUser(req);
     if (!user) return res.status(401).json({ message: "Não autenticado" });
@@ -1014,6 +1088,7 @@ export async function registerRoutes(
     res.json(filtered);
   });
 
+  /** GET /api/notifications/unread-count - Returns count of unread notifications for the current user. Requires auth. */
   app.get("/api/notifications/unread-count", requireAuth, async (req, res) => {
     const user = await getCurrentUser(req);
     if (!user) return res.status(401).json({ message: "Não autenticado" });
@@ -1029,12 +1104,14 @@ export async function registerRoutes(
     res.json({ count: filtered.length });
   });
 
+  /** PUT /api/notifications/:id/read - Marks a single notification as read by ID. Requires auth. */
   app.put("/api/notifications/:id/read", requireAuth, async (req, res) => {
     const id = Number(req.params.id);
     const updated = await storage.markNotificationRead(id);
     res.json(updated);
   });
 
+  /** PUT /api/notifications/read-kanban - Marks all kanban-related notifications as read for the current user. Requires auth. */
   app.put("/api/notifications/read-kanban", requireAuth, async (req, res) => {
     const user = await getCurrentUser(req);
     if (!user) return res.status(401).json({ message: "Não autenticado" });
@@ -1043,6 +1120,7 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
+  /** PUT /api/notifications/read-insights - Marks all insight-related notifications as read for the current user. Requires auth. */
   app.put("/api/notifications/read-insights", requireAuth, async (req, res) => {
     const user = await getCurrentUser(req);
     if (!user) return res.status(401).json({ message: "Não autenticado" });
@@ -1050,6 +1128,7 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
+  /** PUT /api/notifications/read-all - Marks all notifications as read for the current user. Requires auth. */
   app.put("/api/notifications/read-all", requireAuth, async (req, res) => {
     const user = await getCurrentUser(req);
     if (!user) return res.status(401).json({ message: "Não autenticado" });
@@ -1057,6 +1136,7 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
+  /** PUT /api/notifications/read-by-card/:cardId - Marks all notifications for a specific kanban card as read. Requires auth. */
   app.put("/api/notifications/read-by-card/:cardId", requireAuth, async (req, res) => {
     const user = await getCurrentUser(req);
     if (!user) return res.status(401).json({ message: "Não autenticado" });
@@ -1068,6 +1148,7 @@ export async function registerRoutes(
 
   // === COMPETITORS ===
 
+  /** GET /api/competitors - Lists competitors. Client users see only their client's competitors. Requires auth. */
   app.get("/api/competitors", requireAuth, async (req, res) => {
     const user = await getCurrentUser(req);
     if (!user) return res.status(401).json({ message: "Não autenticado" });
@@ -1079,6 +1160,7 @@ export async function registerRoutes(
     res.json(comps);
   });
 
+  /** GET /api/competitors/by-client/:clientId - Returns competitors for a specific client. Client users can only view their own. Requires auth. */
   app.get("/api/competitors/by-client/:clientId", requireAuth, async (req, res) => {
     const clientId = Number(req.params.clientId);
     const user = await getCurrentUser(req);
@@ -1089,6 +1171,7 @@ export async function registerRoutes(
     res.json(comps);
   });
 
+  /** POST /api/competitors - Creates a new competitor. Client users auto-assign their clientId. Requires internal role or client role. */
   app.post("/api/competitors", requireRole(...INTERNAL_ROLES, "client"), async (req, res) => {
     try {
       const user = await getCurrentUser(req);
@@ -1103,6 +1186,7 @@ export async function registerRoutes(
     }
   });
 
+  /** PUT /api/competitors/:id - Updates a competitor. Client users can only update their own client's competitors. */
   app.put("/api/competitors/:id", requireRole(...INTERNAL_ROLES, "client"), async (req, res) => {
     const user = await getCurrentUser(req);
     if (user?.role === "client") {
@@ -1115,6 +1199,7 @@ export async function registerRoutes(
     res.json(comp);
   });
 
+  /** DELETE /api/competitors/:id - Deletes a competitor. Client users can only delete their own client's competitors. */
   app.delete("/api/competitors/:id", requireRole(...INTERNAL_ROLES, "client"), async (req, res) => {
     const user = await getCurrentUser(req);
     if (user?.role === "client") {
@@ -1129,6 +1214,7 @@ export async function registerRoutes(
 
   // === CLIENT DASHBOARD SUMMARY ===
 
+  /** GET /api/dashboard/client-summary - Returns kanban column counts, recent cards, and status summaries for the client user's dashboard. Requires auth. */
   app.get("/api/dashboard/client-summary", requireAuth, async (req, res) => {
     try {
       const user = await getCurrentUser(req);
@@ -1199,6 +1285,7 @@ export async function registerRoutes(
 
   // === DASHBOARD INSIGHTS ===
 
+  /** GET /api/insights/overview - Returns approval rate, monthly data, platform breakdown, and status breakdown for the insights dashboard. Requires auth. */
   app.get("/api/insights/overview", requireAuth, async (req, res) => {
     const user = await getCurrentUser(req);
     if (!user) return res.status(401).json({ message: "Não autenticado" });
@@ -1267,6 +1354,7 @@ export async function registerRoutes(
 
   // === BRIEFING ROUTES ===
 
+  /** GET /api/briefings - Lists briefings. Client users see only their client's briefings. Requires auth. */
   app.get("/api/briefings", requireAuth, async (req, res) => {
     const user = await getCurrentUser(req);
     if (!user) return res.status(401).json({ message: "Não autenticado" });
@@ -1280,6 +1368,7 @@ export async function registerRoutes(
     res.json(result);
   });
 
+  /** GET /api/briefings/public/:token - Returns a briefing by its public token (no auth required). Includes client name. */
   app.get("/api/briefings/public/:token", async (req, res) => {
     const { token } = req.params;
     const briefing = await storage.getBriefingByToken(token);
@@ -1288,6 +1377,7 @@ export async function registerRoutes(
     res.json({ ...briefing, client: client ? { name: client.name } : null });
   });
 
+  /** GET /api/briefings/public/:token/template - Returns the custom template questions for a briefing by its public token. No auth required. */
   app.get("/api/briefings/public/:token/template", async (req, res) => {
     const { token } = req.params;
     const briefing = await storage.getBriefingByToken(token);
@@ -1302,6 +1392,7 @@ export async function registerRoutes(
     res.json({ name: template.name, description: template.description, questions });
   });
 
+  /** PUT /api/briefings/public/:token - Submits answers for a briefing by its public token. Sets status to "Respondido". No auth required. */
   app.put("/api/briefings/public/:token", async (req, res) => {
     const { token } = req.params;
     const briefing = await storage.getBriefingByToken(token);
@@ -1321,6 +1412,7 @@ export async function registerRoutes(
     }
   });
 
+  /** GET /api/linkpage/:slug - Returns public link page data for a client by slug. Filters fields based on visibility settings. No auth required. */
   app.get("/api/linkpage/:slug", async (req, res) => {
     try {
       const { slug } = req.params;
@@ -1367,6 +1459,7 @@ export async function registerRoutes(
     }
   });
 
+  /** PUT /api/onboarding/:clientId/linkpage - Updates link page settings (bio, social links, colors, slug, visibility, theme) for a client. Requires auth + onboarding access. */
   app.put("/api/onboarding/:clientId/linkpage", requireAuth, async (req, res) => {
     const clientId = Number(req.params.clientId);
     if (!(await checkOnboardingAccess(req, clientId))) return res.status(403).json({ message: "Acesso negado" });
@@ -1395,6 +1488,7 @@ export async function registerRoutes(
     }
   });
 
+  /** GET /api/onboarding/:clientId/custom-links - Returns custom links for a client's link page. Requires auth + onboarding access. */
   app.get("/api/onboarding/:clientId/custom-links", requireAuth, async (req, res) => {
     const clientId = Number(req.params.clientId);
     if (!(await checkOnboardingAccess(req, clientId))) return res.status(403).json({ message: "Acesso negado" });
@@ -1402,6 +1496,7 @@ export async function registerRoutes(
     res.json(links);
   });
 
+  /** POST /api/onboarding/:clientId/custom-links - Creates a new custom link for a client's link page. Requires auth + onboarding access. */
   app.post("/api/onboarding/:clientId/custom-links", requireAuth, async (req, res) => {
     const clientId = Number(req.params.clientId);
     if (!(await checkOnboardingAccess(req, clientId))) return res.status(403).json({ message: "Acesso negado" });
@@ -1411,6 +1506,7 @@ export async function registerRoutes(
     res.status(201).json(link);
   });
 
+  /** PUT /api/custom-links/:id - Updates a custom link by ID. Requires auth + internal role. */
   app.put("/api/custom-links/:id", requireAuth, requireRole(...INTERNAL_ROLES), async (req, res) => {
     const id = Number(req.params.id);
     const { name, url, icon, position } = req.body;
@@ -1423,6 +1519,7 @@ export async function registerRoutes(
     res.json(updated);
   });
 
+  /** DELETE /api/custom-links/:id - Deletes a custom link. Internal roles can delete any; client users can only delete their own. Requires auth. */
   app.delete("/api/custom-links/:id", requireAuth, async (req, res) => {
     const user = await getCurrentUser(req);
     if (!user) return res.status(401).json({ message: "Não autenticado" });
@@ -1440,9 +1537,11 @@ export async function registerRoutes(
     return res.status(403).json({ message: "Acesso negado" });
   });
 
+  /** Directory path for storing briefing file uploads */
   const BRIEFING_UPLOADS_DIR = path.join(process.cwd(), "uploads", "briefings");
   if (!fs.existsSync(BRIEFING_UPLOADS_DIR)) fs.mkdirSync(BRIEFING_UPLOADS_DIR, { recursive: true });
 
+  /** POST /api/uploads/briefing - Uploads an image file for a briefing. Requires briefing token header. Max 2MB, images only. No auth required. */
   app.post("/api/uploads/briefing", upload.single("file"), async (req, res) => {
     try {
       const token = (req.headers["x-briefing-token"] || req.headers["X-Briefing-Token"]) as string;
@@ -1476,6 +1575,7 @@ export async function registerRoutes(
     }
   });
 
+  /** GET /api/uploads/briefing/:filename - Serves a previously uploaded briefing file. No auth required. */
   app.get("/api/uploads/briefing/:filename", (req, res) => {
     const filename = req.params.filename;
     const safeName = path.basename(filename);
@@ -1484,9 +1584,11 @@ export async function registerRoutes(
     res.sendFile(filePath);
   });
 
+  /** Directory path for storing client logo uploads */
   const LOGOS_DIR = path.join(process.cwd(), "uploads", "logos");
   if (!fs.existsSync(LOGOS_DIR)) fs.mkdirSync(LOGOS_DIR, { recursive: true });
 
+  /** POST /api/uploads/logo - Uploads and optimizes a client logo image (max 400x400, PNG). Max 5MB. Requires auth. */
   app.post("/api/uploads/logo", requireAuth, upload.single("file"), async (req, res) => {
     try {
       const file = (req as any).file;
@@ -1519,6 +1621,7 @@ export async function registerRoutes(
     }
   });
 
+  /** GET /api/uploads/logo/:filename - Serves a previously uploaded logo file with 24h cache. No auth required. */
   app.get("/api/uploads/logo/:filename", (req, res) => {
     const filename = req.params.filename;
     const safeName = path.basename(filename);
@@ -1528,6 +1631,7 @@ export async function registerRoutes(
     res.sendFile(filePath);
   });
 
+  /** GET /api/briefings/:id - Returns a single briefing by ID. Client users can only access their own client's briefings. Requires auth. */
   app.get("/api/briefings/:id", requireAuth, async (req, res) => {
     const id = parseInt(String(req.params.id));
     if (isNaN(id)) return res.status(400).json({ message: "ID inválido" });
@@ -1540,6 +1644,7 @@ export async function registerRoutes(
     res.json(briefing);
   });
 
+  /** POST /api/briefings - Creates a new briefing with a unique public token. Requires internal role. */
   app.post("/api/briefings", requireRole(...INTERNAL_ROLES), async (req, res) => {
     try {
       const { clientId, clientName, title, briefingType, templateId } = req.body;
@@ -1563,6 +1668,7 @@ export async function registerRoutes(
     }
   });
 
+  /** PUT /api/briefings/:id - Updates a briefing by ID. Requires internal role. */
   app.put("/api/briefings/:id", requireRole(...INTERNAL_ROLES), async (req, res) => {
     const id = parseInt(String(req.params.id));
     if (isNaN(id)) return res.status(400).json({ message: "ID inválido" });
@@ -1575,6 +1681,7 @@ export async function registerRoutes(
     }
   });
 
+  /** DELETE /api/briefings/:id - Deletes a briefing by ID. Requires internal role. */
   app.delete("/api/briefings/:id", requireRole(...INTERNAL_ROLES), async (req, res) => {
     const id = parseInt(String(req.params.id));
     if (isNaN(id)) return res.status(400).json({ message: "ID inválido" });
@@ -1582,11 +1689,13 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
+  /** GET /api/briefing-templates - Lists all briefing templates. Requires auth. */
   app.get("/api/briefing-templates", requireAuth, async (_req, res) => {
     const templates = await storage.getBriefingTemplates();
     res.json(templates);
   });
 
+  /** GET /api/briefing-templates/:id - Returns a single briefing template by ID. Requires auth. */
   app.get("/api/briefing-templates/:id", requireAuth, async (req, res) => {
     const id = Number(req.params.id);
     const template = await storage.getBriefingTemplate(id);
@@ -1594,6 +1703,7 @@ export async function registerRoutes(
     res.json(template);
   });
 
+  /** POST /api/briefing-templates - Creates a new briefing template. Requires internal role. */
   app.post("/api/briefing-templates", requireRole(...INTERNAL_ROLES), async (req, res) => {
     try {
       const user = await getCurrentUser(req);
@@ -1610,6 +1720,7 @@ export async function registerRoutes(
     }
   });
 
+  /** PUT /api/briefing-templates/:id - Updates a briefing template by ID. Requires internal role. */
   app.put("/api/briefing-templates/:id", requireRole(...INTERNAL_ROLES), async (req, res) => {
     const id = Number(req.params.id);
     try {
@@ -1621,12 +1732,14 @@ export async function registerRoutes(
     }
   });
 
+  /** DELETE /api/briefing-templates/:id - Deletes a briefing template by ID. Requires internal role. */
   app.delete("/api/briefing-templates/:id", requireRole(...INTERNAL_ROLES), async (req, res) => {
     const id = Number(req.params.id);
     await storage.deleteBriefingTemplate(id);
     res.json({ success: true });
   });
 
+  /** POST /api/uploads/briefing-file - Uploads a file for a briefing (any type, max 10MB). Attempts Google Drive upload first, falls back to local storage. Requires briefing token header. */
   app.post("/api/uploads/briefing-file", upload.single("file"), async (req, res) => {
     try {
       const token = (req.headers["x-briefing-token"] || req.headers["X-Briefing-Token"]) as string;
@@ -1684,6 +1797,7 @@ export async function registerRoutes(
 
   // === SYSTEM SETTINGS ROUTES ===
 
+  /** GET /api/settings/drive - Returns masked Google Drive credentials status. Requires admin role. */
   app.get("/api/settings/drive", requireAuth, requireRole("admin"), async (_req, res) => {
     try {
       const settings = await storage.getSystemSettings([
@@ -1703,6 +1817,7 @@ export async function registerRoutes(
     }
   });
 
+  /** POST /api/settings/drive - Saves and validates Google Drive OAuth credentials. Tests connection before saving. Requires admin role. */
   app.post("/api/settings/drive", requireAuth, requireRole("admin"), async (req, res) => {
     try {
       const { googleClientId, googleClientSecret, googleRefreshToken } = req.body;
@@ -1733,6 +1848,7 @@ export async function registerRoutes(
     }
   });
 
+  /** DELETE /api/settings/drive - Removes all Google Drive credentials and resets the OAuth client. Requires admin role. */
   app.delete("/api/settings/drive", requireAuth, requireRole("admin"), async (_req, res) => {
     try {
       await storage.setSystemSetting("GOOGLE_CLIENT_ID", "");
@@ -1748,9 +1864,11 @@ export async function registerRoutes(
 
   // === SYSTEM BRANDING SETTINGS ===
 
+  /** Directory path for storing system branding uploads (logo, favicon) */
   const SYSTEM_UPLOADS_DIR = path.join(process.cwd(), "uploads", "system");
   if (!fs.existsSync(SYSTEM_UPLOADS_DIR)) fs.mkdirSync(SYSTEM_UPLOADS_DIR, { recursive: true });
 
+  /** GET /api/settings/branding - Returns system branding settings (name, logo, favicon, theme). No auth required. */
   app.get("/api/settings/branding", async (_req, res) => {
     try {
       const settings = await storage.getSystemSettings([
@@ -1768,6 +1886,7 @@ export async function registerRoutes(
     }
   });
 
+  /** PUT /api/settings/branding - Updates system branding settings (name, theme). Validates theme against allowed values. Requires admin role. */
   app.put("/api/settings/branding", requireAuth, requireRole("admin"), async (req, res) => {
     try {
       const { systemName, systemTheme } = req.body;
@@ -1786,6 +1905,7 @@ export async function registerRoutes(
     }
   });
 
+  /** POST /api/uploads/system/:type - Uploads a system logo or favicon image. Resizes and converts to PNG. Requires admin role. */
   app.post("/api/uploads/system/:type", requireAuth, requireRole("admin"), upload.single("file"), async (req, res) => {
     try {
       const uploadType = req.params.type;
@@ -1833,6 +1953,7 @@ export async function registerRoutes(
     }
   });
 
+  /** GET /api/uploads/system/:filename - Serves a previously uploaded system file (logo/favicon) with 24h cache. No auth required. */
   app.get("/api/uploads/system/:filename", (req, res) => {
     const safeName = path.basename(req.params.filename);
     const filePath = path.join(SYSTEM_UPLOADS_DIR, safeName);
@@ -1843,6 +1964,7 @@ export async function registerRoutes(
 
   // === GOOGLE DRIVE ROUTES ===
 
+  /** GET /api/drive/status - Returns Google Drive connection status and user info. Requires admin role. */
   app.get("/api/drive/status", requireRole("admin"), async (_req, res) => {
     try {
       const connected = await isDriveConnected();
@@ -1856,6 +1978,7 @@ export async function registerRoutes(
     }
   });
 
+  /** POST /api/drive/sync-client/:id - Creates a Google Drive folder for a specific client and updates the client record. Requires admin role. */
   app.post("/api/drive/sync-client/:id", requireRole("admin"), async (req, res) => {
     const id = Number(req.params.id);
     const client = await storage.getClient(id);
@@ -1874,6 +1997,7 @@ export async function registerRoutes(
     }
   });
 
+  /** POST /api/drive/sync-all - Creates Google Drive folders for all clients that don't have one yet. Requires admin role. */
   app.post("/api/drive/sync-all", requireRole("admin"), async (_req, res) => {
     const allClients = await storage.getClients();
     const results: { clientId: number; name: string; success: boolean; error?: string }[] = [];
@@ -1898,6 +2022,12 @@ export async function registerRoutes(
     res.json({ results });
   });
 
+  /**
+   * GET /api/approvals/:id/drive-files
+   * Retrieves Google Drive files associated with an approval post.
+   * Returns cached driveFileIds if available, otherwise lists files from the Drive folder.
+   * Requires authentication.
+   */
   app.get("/api/approvals/:id/drive-files", requireAuth, async (req, res) => {
     try {
       const id = Number(req.params.id);
@@ -1931,6 +2061,12 @@ export async function registerRoutes(
     }
   });
 
+  /**
+   * GET /api/approvals/:id/drive-history
+   * Retrieves the version history of Drive files for an approval post.
+   * Lists version folders and their contained files from the client's Drive folder.
+   * Requires authentication.
+   */
   app.get("/api/approvals/:id/drive-history", requireAuth, async (req, res) => {
     try {
       const id = Number(req.params.id);
@@ -1975,6 +2111,13 @@ export async function registerRoutes(
 
   // === KANBAN ROUTES ===
 
+  /**
+   * GET /api/kanban/:clientId/columns
+   * Lists all Kanban columns for a given client. Auto-creates default columns if none exist,
+   * adds missing required columns, handles conditional columns (Reunião/Captação),
+   * and reorders columns to match expected positions.
+   * Requires authentication. Clients can only access their own columns.
+   */
   app.get("/api/kanban/:clientId/columns", requireAuth, async (req, res) => {
     const clientId = Number(req.params.clientId);
     const user = await getCurrentUser(req);
@@ -2050,6 +2193,11 @@ export async function registerRoutes(
     res.json(columns);
   });
 
+  /**
+   * POST /api/kanban/:clientId/columns
+   * Creates a new Kanban column for a client.
+   * Requires internal role (admin/designer).
+   */
   app.post("/api/kanban/:clientId/columns", requireRole(...INTERNAL_ROLES), async (req, res) => {
     const clientId = Number(req.params.clientId);
     const { title, position } = req.body;
@@ -2057,6 +2205,11 @@ export async function registerRoutes(
     res.json(col);
   });
 
+  /**
+   * PUT /api/kanban/columns/:id
+   * Updates a Kanban column. Protected columns cannot be renamed.
+   * Requires internal role (admin/designer).
+   */
   app.put("/api/kanban/columns/:id", requireRole(...INTERNAL_ROLES), async (req, res) => {
     const colId = Number(req.params.id);
     const existingCol = await storage.getKanbanColumn(colId);
@@ -2067,6 +2220,11 @@ export async function registerRoutes(
     res.json(col);
   });
 
+  /**
+   * DELETE /api/kanban/columns/:id
+   * Deletes a Kanban column. Protected/mandatory columns cannot be deleted.
+   * Requires internal role (admin/designer).
+   */
   app.delete("/api/kanban/columns/:id", requireRole(...INTERNAL_ROLES), async (req, res) => {
     const colId = Number(req.params.id);
     const colToDelete = await storage.getKanbanColumn(colId);
@@ -2077,12 +2235,22 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
+  /**
+   * PUT /api/kanban/:clientId/columns/reorder
+   * Reorders Kanban columns for a client by providing an array of column IDs.
+   * Requires internal role (admin/designer).
+   */
   app.put("/api/kanban/:clientId/columns/reorder", requireRole(...INTERNAL_ROLES), async (req, res) => {
     const { columnIds } = req.body;
     await storage.reorderKanbanColumns(Number(req.params.clientId), columnIds);
     res.json({ success: true });
   });
 
+  /**
+   * GET /api/kanban/:clientId/cards
+   * Lists all Kanban cards for a given client.
+   * Requires authentication. Clients can only access their own cards.
+   */
   app.get("/api/kanban/:clientId/cards", requireAuth, async (req, res) => {
     const clientId = Number(req.params.clientId);
     const user = await getCurrentUser(req);
@@ -2093,6 +2261,12 @@ export async function registerRoutes(
     res.json(cards);
   });
 
+  /**
+   * GET /api/client/approval-cards
+   * Lists Kanban cards that have an approval status (Pendente, Aprovado, Reprovado, Revisão).
+   * Clients see only their own cards; internal roles can filter by clientId or see all.
+   * Requires authentication.
+   */
   app.get("/api/client/approval-cards", requireAuth, async (req, res) => {
     const user = await getCurrentUser(req);
     if (!user) return res.status(401).json({ message: "Não autenticado" });
@@ -2123,12 +2297,23 @@ export async function registerRoutes(
     res.json(approvalCards);
   });
 
+  /**
+   * GET /api/kanban/cards/:id
+   * Retrieves a single Kanban card by ID.
+   * Requires authentication.
+   */
   app.get("/api/kanban/cards/:id", requireAuth, async (req, res) => {
     const card = await storage.getKanbanCard(Number(req.params.id));
     if (!card) return res.status(404).json({ message: "Cartão não encontrado" });
     res.json(card);
   });
 
+  /**
+   * POST /api/kanban/cards
+   * Creates a new Kanban card. Always placed in the mandatory first column ("Fila").
+   * Starts a time entry if the column is timed. Creates notifications for relevant roles.
+   * Requires authentication.
+   */
   app.post("/api/kanban/cards", requireAuth, async (req, res) => {
     const user = await getCurrentUser(req);
     const { clientId } = req.body;
@@ -2191,16 +2376,33 @@ export async function registerRoutes(
     res.json(card);
   });
 
+  /**
+   * PUT /api/kanban/cards/:id
+   * Updates a Kanban card's fields (title, description, template data, etc.).
+   * Requires authentication.
+   */
   app.put("/api/kanban/cards/:id", requireAuth, async (req, res) => {
     const card = await storage.updateKanbanCard(Number(req.params.id), req.body);
     res.json(card);
   });
 
+  /**
+   * DELETE /api/kanban/cards/:id
+   * Deletes a Kanban card.
+   * Requires internal role (admin/designer).
+   */
   app.delete("/api/kanban/cards/:id", requireRole(...INTERNAL_ROLES), async (req, res) => {
     await storage.deleteKanbanCard(Number(req.params.id));
     res.json({ success: true });
   });
 
+  /**
+   * PUT /api/kanban/cards/:id/move
+   * Moves a Kanban card to a different column and/or position.
+   * Enforces workflow restrictions (e.g., restricted columns for manual moves).
+   * Manages time entries, activity logs, approval status, and notifications.
+   * Requires authentication.
+   */
   app.put("/api/kanban/cards/:id/move", requireAuth, async (req, res) => {
     const { toColumnId, newPosition } = req.body;
     const cardId = Number(req.params.id);
@@ -2299,6 +2501,12 @@ export async function registerRoutes(
     res.json(card);
   });
 
+  /**
+   * PUT /api/kanban/cards/:id/back-to-fila
+   * Moves a Kanban card back to the "Fila" (queue) column.
+   * Stops current time entry and starts a new one in the queue column.
+   * Requires internal role (admin/designer).
+   */
   app.put("/api/kanban/cards/:id/back-to-fila", requireAuth, requireRole(...INTERNAL_ROLES), async (req, res) => {
     try {
       const cardId = Number(req.params.id);
@@ -2345,6 +2553,14 @@ export async function registerRoutes(
     }
   });
 
+  /**
+   * Moves a Kanban card to a target column by title.
+   * Creates the column if it doesn't exist. Logs activity, manages time entries.
+   * @param card - The card object to move
+   * @param targetColumnTitle - The title of the destination column
+   * @param userId - Optional user ID performing the move
+   * @returns The updated card object
+   */
   async function moveCardToColumn(card: any, targetColumnTitle: string, userId?: number | null): Promise<any> {
     const columns = await storage.getKanbanColumnsByClient(card.clientId);
     let targetCol = columns.find(c => c.title === targetColumnTitle);
@@ -2392,6 +2608,12 @@ export async function registerRoutes(
     return updated;
   }
 
+  /**
+   * POST /api/kanban/cards/:id/send-approval
+   * Sends a Kanban card for client approval. Sets status to "Pendente" and moves to "Em Aprovação" column.
+   * Creates notification for the client. Fails if card is already linked to an approval post.
+   * Requires internal role (admin/designer).
+   */
   app.post("/api/kanban/cards/:id/send-approval", requireRole(...INTERNAL_ROLES), async (req, res) => {
     const cardId = Number(req.params.id);
     const card = await storage.getKanbanCard(cardId);
@@ -2429,6 +2651,13 @@ export async function registerRoutes(
     res.json(moved);
   });
 
+  /**
+   * POST /api/kanban/cards/:id/approve
+   * Approves a Kanban card. Sets status to "Aprovado", moves to "Aprovados" column.
+   * Auto-creates a scheduled post from the card's template data.
+   * Only clients (for their own cards) and admins can approve.
+   * Requires authentication.
+   */
   app.post("/api/kanban/cards/:id/approve", requireAuth, async (req, res) => {
     const cardId = Number(req.params.id);
     const card = await storage.getKanbanCard(cardId);
@@ -2544,6 +2773,13 @@ export async function registerRoutes(
     res.json(moved);
   });
 
+  /**
+   * POST /api/kanban/cards/:id/reject
+   * Rejects a Kanban card. Sets status to "Reprovado", moves to "Reprovados" column.
+   * Creates notifications for admin and designer roles.
+   * Only clients (for their own cards) and admins can reject.
+   * Requires authentication.
+   */
   app.post("/api/kanban/cards/:id/reject", requireAuth, async (req, res) => {
     const cardId = Number(req.params.id);
     const card = await storage.getKanbanCard(cardId);
@@ -2594,6 +2830,13 @@ export async function registerRoutes(
     res.json(moved);
   });
 
+  /**
+   * POST /api/kanban/cards/:id/revision
+   * Requests revision on a Kanban card. Sets status to "Revisão", moves to "Revisão" column.
+   * Creates notifications for admin and designer roles.
+   * Only clients (for their own cards) and admins can request revision.
+   * Requires authentication.
+   */
   app.post("/api/kanban/cards/:id/revision", requireAuth, async (req, res) => {
     const cardId = Number(req.params.id);
     const card = await storage.getKanbanCard(cardId);
@@ -2644,6 +2887,13 @@ export async function registerRoutes(
     res.json(moved);
   });
 
+  /**
+   * POST /api/kanban/cards/:id/undo-approval
+   * Undoes a previous approval/rejection/revision decision on a Kanban card.
+   * Resets status to "Pendente" and moves back to "Em Aprovação" column.
+   * Only clients (for their own cards) and admins can undo decisions.
+   * Requires authentication.
+   */
   app.post("/api/kanban/cards/:id/undo-approval", requireAuth, async (req, res) => {
     const cardId = Number(req.params.id);
     const card = await storage.getKanbanCard(cardId);
@@ -2690,6 +2940,12 @@ export async function registerRoutes(
     res.json(moved);
   });
 
+  /**
+   * POST /api/kanban/cards/:id/attachments
+   * Uploads a file attachment to a Kanban card via Google Drive.
+   * Generates a thumbnail for image files. Sets card cover if none exists.
+   * Requires authentication. Client must have a Drive folder configured.
+   */
   app.post("/api/kanban/cards/:id/attachments", requireAuth, upload.single("file"), async (req, res) => {
     try {
       const cardId = Number(req.params.id);
@@ -2766,6 +3022,11 @@ export async function registerRoutes(
     }
   });
 
+  /**
+   * DELETE /api/kanban/cards/:id/attachments/:attachmentId
+   * Removes a specific attachment from a Kanban card by attachment ID.
+   * Requires authentication.
+   */
   app.delete("/api/kanban/cards/:id/attachments/:attachmentId", requireAuth, async (req, res) => {
     try {
       const cardId = Number(req.params.id);
@@ -2790,6 +3051,11 @@ export async function registerRoutes(
     }
   });
 
+  /**
+   * GET /api/kanban/drive-folders/:clientId
+   * Lists Google Drive extension folders for a client's Kanban files.
+   * Requires authentication.
+   */
   app.get("/api/kanban/drive-folders/:clientId", requireAuth, async (req, res) => {
     try {
       const clientId = Number(req.params.clientId);
@@ -2805,11 +3071,22 @@ export async function registerRoutes(
     }
   });
 
+  /**
+   * GET /api/kanban/cards/:id/comments
+   * Lists all comments on a Kanban card.
+   * Requires authentication.
+   */
   app.get("/api/kanban/cards/:id/comments", requireAuth, async (req, res) => {
     const comments = await storage.getKanbanComments(Number(req.params.id));
     res.json(comments);
   });
 
+  /**
+   * POST /api/kanban/cards/:id/comments
+   * Adds a comment to a Kanban card. Creates notifications for relevant roles
+   * (client comments notify admin/designer, internal comments notify client and other roles).
+   * Requires authentication.
+   */
   app.post("/api/kanban/cards/:id/comments", requireAuth, async (req, res) => {
     const user = await getCurrentUser(req);
     if (!user) return res.status(401).json({ message: "Não autenticado" });
@@ -2864,21 +3141,42 @@ export async function registerRoutes(
     res.json(comment);
   });
 
+  /**
+   * DELETE /api/kanban/comments/:id
+   * Deletes a Kanban card comment.
+   * Requires authentication.
+   */
   app.delete("/api/kanban/comments/:id", requireAuth, async (req, res) => {
     await storage.deleteKanbanComment(Number(req.params.id));
     res.json({ success: true });
   });
 
+  /**
+   * GET /api/kanban/cards/:id/activity
+   * Retrieves the activity log (movements, approvals, etc.) for a Kanban card.
+   * Requires authentication.
+   */
   app.get("/api/kanban/cards/:id/activity", requireAuth, async (req, res) => {
     const activity = await storage.getKanbanActivity(Number(req.params.id));
     res.json(activity);
   });
 
+  /**
+   * GET /api/kanban/cards/:id/time-entries
+   * Retrieves all time tracking entries for a specific Kanban card.
+   * Requires authentication.
+   */
   app.get("/api/kanban/cards/:id/time-entries", requireAuth, async (req, res) => {
     const entries = await storage.getKanbanTimeEntries(Number(req.params.id));
     res.json(entries);
   });
 
+  /**
+   * GET /api/kanban/client/:clientId/column-times
+   * Calculates accumulated time and open timer status per card in the current column
+   * for all cards belonging to a client. Excludes timer-excluded columns.
+   * Requires authentication.
+   */
   app.get("/api/kanban/client/:clientId/column-times", requireAuth, async (req, res) => {
     try {
       const clientId = Number(req.params.clientId);
@@ -2932,6 +3230,12 @@ export async function registerRoutes(
     }
   });
 
+  /**
+   * GET /api/kanban/reports/designer
+   * Generates a time report per designer (internal users), showing total time spent,
+   * cards worked on, and per-card breakdowns.
+   * Requires internal role (admin/designer).
+   */
   app.get("/api/kanban/reports/designer", requireRole(...INTERNAL_ROLES), async (req, res) => {
     try {
       const allUsers = await storage.getUsers();
@@ -2980,6 +3284,13 @@ export async function registerRoutes(
 
   // === CLIENT ONBOARDING ROUTES ===
 
+  /**
+   * Checks if the current user has access to onboarding data for a given client.
+   * Internal roles always have access; client users can only access their own client.
+   * @param req - Express request object
+   * @param clientId - The client ID to check access for
+   * @returns True if the user has access, false otherwise
+   */
   async function checkOnboardingAccess(req: any, clientId: number): Promise<boolean> {
     const user = await getCurrentUser(req);
     if (!user) return false;
@@ -2988,12 +3299,22 @@ export async function registerRoutes(
     return false;
   }
 
+  /**
+   * GET /api/onboarding/:clientId/products
+   * Lists all products for a client's onboarding profile.
+   * Requires authentication and onboarding access.
+   */
   app.get("/api/onboarding/:clientId/products", requireAuth, async (req, res) => {
     const clientId = Number(req.params.clientId);
     if (!(await checkOnboardingAccess(req, clientId))) return res.status(403).json({ message: "Acesso negado" });
     const products = await storage.getClientProducts(clientId);
     res.json(products);
   });
+  /**
+   * POST /api/onboarding/:clientId/products
+   * Creates a new product for a client's onboarding profile.
+   * Requires authentication and onboarding access.
+   */
   app.post("/api/onboarding/:clientId/products", requireAuth, async (req, res) => {
     const clientId = Number(req.params.clientId);
     if (!(await checkOnboardingAccess(req, clientId))) return res.status(403).json({ message: "Acesso negado" });
@@ -3001,21 +3322,41 @@ export async function registerRoutes(
     const product = await storage.createClientProduct(parsed);
     res.json(product);
   });
+  /**
+   * PUT /api/onboarding/products/:id
+   * Updates an onboarding product by ID.
+   * Requires internal role (admin/designer).
+   */
   app.put("/api/onboarding/products/:id", requireAuth, requireRole(...INTERNAL_ROLES), async (req, res) => {
     const product = await storage.updateClientProduct(Number(req.params.id), req.body);
     res.json(product);
   });
+  /**
+   * DELETE /api/onboarding/products/:id
+   * Deletes an onboarding product by ID.
+   * Requires internal role (admin/designer).
+   */
   app.delete("/api/onboarding/products/:id", requireAuth, requireRole(...INTERNAL_ROLES), async (req, res) => {
     await storage.deleteClientProduct(Number(req.params.id));
     res.json({ success: true });
   });
 
+  /**
+   * GET /api/onboarding/:clientId/services
+   * Lists all services for a client's onboarding profile.
+   * Requires authentication and onboarding access.
+   */
   app.get("/api/onboarding/:clientId/services", requireAuth, async (req, res) => {
     const clientId = Number(req.params.clientId);
     if (!(await checkOnboardingAccess(req, clientId))) return res.status(403).json({ message: "Acesso negado" });
     const services = await storage.getClientServices(clientId);
     res.json(services);
   });
+  /**
+   * POST /api/onboarding/:clientId/services
+   * Creates a new service for a client's onboarding profile.
+   * Requires authentication and onboarding access.
+   */
   app.post("/api/onboarding/:clientId/services", requireAuth, async (req, res) => {
     const clientId = Number(req.params.clientId);
     if (!(await checkOnboardingAccess(req, clientId))) return res.status(403).json({ message: "Acesso negado" });
@@ -3023,21 +3364,41 @@ export async function registerRoutes(
     const service = await storage.createClientService(parsed);
     res.json(service);
   });
+  /**
+   * PUT /api/onboarding/services/:id
+   * Updates an onboarding service by ID.
+   * Requires internal role (admin/designer).
+   */
   app.put("/api/onboarding/services/:id", requireAuth, requireRole(...INTERNAL_ROLES), async (req, res) => {
     const service = await storage.updateClientService(Number(req.params.id), req.body);
     res.json(service);
   });
+  /**
+   * DELETE /api/onboarding/services/:id
+   * Deletes an onboarding service by ID.
+   * Requires internal role (admin/designer).
+   */
   app.delete("/api/onboarding/services/:id", requireAuth, requireRole(...INTERNAL_ROLES), async (req, res) => {
     await storage.deleteClientService(Number(req.params.id));
     res.json({ success: true });
   });
 
+  /**
+   * GET /api/onboarding/:clientId/credentials
+   * Lists all credentials for a client's onboarding profile.
+   * Requires authentication and onboarding access.
+   */
   app.get("/api/onboarding/:clientId/credentials", requireAuth, async (req, res) => {
     const clientId = Number(req.params.clientId);
     if (!(await checkOnboardingAccess(req, clientId))) return res.status(403).json({ message: "Acesso negado" });
     const creds = await storage.getClientCredentials(clientId);
     res.json(creds);
   });
+  /**
+   * POST /api/onboarding/:clientId/credentials
+   * Creates a new credential for a client's onboarding profile.
+   * Requires authentication and onboarding access.
+   */
   app.post("/api/onboarding/:clientId/credentials", requireAuth, async (req, res) => {
     const clientId = Number(req.params.clientId);
     if (!(await checkOnboardingAccess(req, clientId))) return res.status(403).json({ message: "Acesso negado" });
@@ -3045,35 +3406,71 @@ export async function registerRoutes(
     const cred = await storage.createClientCredential(parsed);
     res.json(cred);
   });
+  /**
+   * PUT /api/onboarding/credentials/:id
+   * Updates an onboarding credential by ID.
+   * Requires internal role (admin/designer).
+   */
   app.put("/api/onboarding/credentials/:id", requireAuth, requireRole(...INTERNAL_ROLES), async (req, res) => {
     const cred = await storage.updateClientCredential(Number(req.params.id), req.body);
     res.json(cred);
   });
+  /**
+   * DELETE /api/onboarding/credentials/:id
+   * Deletes an onboarding credential by ID.
+   * Requires internal role (admin/designer).
+   */
   app.delete("/api/onboarding/credentials/:id", requireAuth, requireRole(...INTERNAL_ROLES), async (req, res) => {
     await storage.deleteClientCredential(Number(req.params.id));
     res.json({ success: true });
   });
 
+  /**
+   * GET /api/onboarding/:clientId/text-templates
+   * Lists all text templates for a client's onboarding profile.
+   * Requires authentication.
+   */
   app.get("/api/onboarding/:clientId/text-templates", requireAuth, async (req, res) => {
     const clientId = Number(req.params.clientId);
     const templates = await storage.getClientTextTemplates(clientId);
     res.json(templates);
   });
+  /**
+   * POST /api/onboarding/:clientId/text-templates
+   * Creates a new text template for a client's onboarding profile.
+   * Requires authentication and onboarding access.
+   */
   app.post("/api/onboarding/:clientId/text-templates", requireAuth, async (req, res) => {
     const clientId = Number(req.params.clientId);
     if (!(await checkOnboardingAccess(req, clientId))) return res.status(403).json({ message: "Acesso negado" });
     const template = await storage.createClientTextTemplate({ clientId, ...req.body });
     res.json(template);
   });
+  /**
+   * PUT /api/onboarding/text-templates/:id
+   * Updates an onboarding text template by ID.
+   * Requires internal role (admin/designer).
+   */
   app.put("/api/onboarding/text-templates/:id", requireAuth, requireRole(...INTERNAL_ROLES), async (req, res) => {
     const template = await storage.updateClientTextTemplate(Number(req.params.id), req.body);
     res.json(template);
   });
+  /**
+   * DELETE /api/onboarding/text-templates/:id
+   * Deletes an onboarding text template by ID.
+   * Requires internal role (admin/designer).
+   */
   app.delete("/api/onboarding/text-templates/:id", requireAuth, requireRole(...INTERNAL_ROLES), async (req, res) => {
     await storage.deleteClientTextTemplate(Number(req.params.id));
     res.json({ success: true });
   });
 
+  /**
+   * GET /api/insights/all
+   * Lists all client insights, enriched with user and client names.
+   * Clients see only their own insights; internal roles see all.
+   * Requires authentication.
+   */
   app.get("/api/insights/all", requireAuth, async (req, res) => {
     const user = await getCurrentUser(req);
     if (!user) return res.status(401).json({ message: "Não autenticado" });
@@ -3093,6 +3490,11 @@ export async function registerRoutes(
     res.json(enriched);
   });
 
+  /**
+   * GET /api/onboarding/:clientId/insights
+   * Lists all insights for a specific client, enriched with user names.
+   * Requires authentication and onboarding access.
+   */
   app.get("/api/onboarding/:clientId/insights", requireAuth, async (req, res) => {
     const clientId = Number(req.params.clientId);
     if (!(await checkOnboardingAccess(req, clientId))) return res.status(403).json({ message: "Acesso negado" });
@@ -3103,6 +3505,11 @@ export async function registerRoutes(
     const enriched = insights.map(i => ({ ...i, userName: userMap[i.userId] || "Desconhecido" }));
     res.json(enriched);
   });
+  /**
+   * POST /api/onboarding/:clientId/insights
+   * Creates a new insight for a client. Sends notifications to relevant roles.
+   * Requires authentication and onboarding access.
+   */
   app.post("/api/onboarding/:clientId/insights", requireAuth, async (req, res) => {
     const user = await getCurrentUser(req);
     if (!user) return res.status(401).json({ message: "Não autenticado" });
@@ -3139,16 +3546,31 @@ export async function registerRoutes(
     return res.status(403).json({ message: "Sem permissão para apagar este insight" });
   });
 
+  /**
+   * GET /api/onboarding/:clientId/access
+   * Lists user IDs that have onboarding access for a client.
+   * Requires admin role.
+   */
   app.get("/api/onboarding/:clientId/access", requireAuth, requireRole(["admin"]), async (req, res) => {
     const access = await storage.getOnboardingAccess(Number(req.params.clientId));
     res.json(access.map(a => a.userId));
   });
+  /**
+   * PUT /api/onboarding/:clientId/access
+   * Sets the list of user IDs that have onboarding access for a client.
+   * Requires admin role.
+   */
   app.put("/api/onboarding/:clientId/access", requireAuth, requireRole(["admin"]), async (req, res) => {
     const { userIds } = req.body;
     await storage.setOnboardingAccess(Number(req.params.clientId), userIds || []);
     res.json({ success: true, userIds });
   });
 
+  /**
+   * PUT /api/clients/:id/about
+   * Updates the "about" description of a client.
+   * Requires authentication and onboarding access.
+   */
   app.put("/api/clients/:id/about", requireAuth, async (req, res) => {
     const clientId = Number(req.params.id);
     if (!(await checkOnboardingAccess(req, clientId))) return res.status(403).json({ message: "Acesso negado" });
@@ -3157,6 +3579,11 @@ export async function registerRoutes(
     res.json(updated);
   });
 
+  /**
+   * PUT /api/clients/:id/notes
+   * Updates the notes field of a client.
+   * Requires authentication and onboarding access.
+   */
   app.put("/api/clients/:id/notes", requireAuth, async (req, res) => {
     const clientId = Number(req.params.id);
     if (!(await checkOnboardingAccess(req, clientId))) return res.status(403).json({ message: "Acesso negado" });
@@ -3165,6 +3592,11 @@ export async function registerRoutes(
     res.json(updated);
   });
 
+  /**
+   * PUT /api/clients/:id/tags
+   * Updates the tags array of a client.
+   * Requires authentication and onboarding access.
+   */
   app.put("/api/clients/:id/tags", requireAuth, async (req, res) => {
     const clientId = Number(req.params.id);
     if (!(await checkOnboardingAccess(req, clientId))) return res.status(403).json({ message: "Acesso negado" });
@@ -3173,6 +3605,11 @@ export async function registerRoutes(
     res.json(updated);
   });
 
+  /**
+   * PUT /api/clients/:id/market-tags
+   * Updates the market tags array of a client.
+   * Requires authentication and onboarding access.
+   */
   app.put("/api/clients/:id/market-tags", requireAuth, async (req, res) => {
     const clientId = Number(req.params.id);
     if (!(await checkOnboardingAccess(req, clientId))) return res.status(403).json({ message: "Acesso negado" });
@@ -3181,6 +3618,11 @@ export async function registerRoutes(
     res.json(updated);
   });
 
+  /**
+   * POST /api/clients/:id/suggest-tags
+   * Uses OpenAI to suggest relevant tags for a client based on their profile.
+   * Requires authentication and onboarding access.
+   */
   app.post("/api/clients/:id/suggest-tags", requireAuth, async (req, res) => {
     try {
       const clientId = Number(req.params.id);
@@ -3201,6 +3643,11 @@ export async function registerRoutes(
     }
   });
 
+  /**
+   * POST /api/clients/:id/suggest-market-tags
+   * Uses OpenAI to suggest relevant market tags for a client based on their profile.
+   * Requires authentication and onboarding access.
+   */
   app.post("/api/clients/:id/suggest-market-tags", requireAuth, async (req, res) => {
     try {
       const clientId = Number(req.params.id);
@@ -3221,6 +3668,11 @@ export async function registerRoutes(
     }
   });
 
+  /**
+   * PUT /api/clients/:id/kanban-bg
+   * Updates the Kanban board background color and/or image for a client.
+   * Requires internal role (admin/designer).
+   */
   app.put("/api/clients/:id/kanban-bg", requireRole(...INTERNAL_ROLES), async (req, res) => {
     const clientId = Number(req.params.id);
     const { kanbanBgColor, kanbanBgImage } = req.body;
@@ -3231,6 +3683,11 @@ export async function registerRoutes(
     res.json(updated);
   });
 
+  /**
+   * GET /api/thumbnails/:filename
+   * Serves a cached thumbnail image file. Returns 404 if not found.
+   * Public endpoint (no auth required). Responses are cached for 1 year.
+   */
   app.get("/api/thumbnails/:filename", (req, res) => {
     const filename = req.params.filename;
     if (filename.includes("..") || filename.includes("/")) {
@@ -3245,6 +3702,12 @@ export async function registerRoutes(
     res.sendFile(filePath);
   });
 
+  /**
+   * GET /api/drive-proxy/:fileId
+   * Proxies a Google Drive file stream to the client. Client users can only access
+   * files attached to their own Kanban cards. Sets content-type and caching headers.
+   * Requires authentication.
+   */
   app.get("/api/drive-proxy/:fileId", requireAuth, async (req, res) => {
     try {
       const { fileId } = req.params;
@@ -3276,6 +3739,12 @@ export async function registerRoutes(
     }
   });
 
+  /**
+   * POST /api/kanban/cards/:id/cover-upload
+   * Uploads an image file as the cover of a Kanban card. Uploads to Google Drive,
+   * generates thumbnails (standard + cover-sized), and updates the card.
+   * Requires authentication. Only image files are accepted.
+   */
   app.post("/api/kanban/cards/:id/cover-upload", requireAuth, upload.single("file"), async (req, res) => {
     try {
       const cardId = Number(req.params.id);
@@ -3349,6 +3818,13 @@ export async function registerRoutes(
   registerLocalStorageRoutes(app);
 
   // === CARD TIME REPORT ===
+
+  /**
+   * GET /api/reports/card-times
+   * Generates a detailed time report for Kanban cards, showing time spent per column.
+   * Can be filtered by clientId. Results sorted by total time descending.
+   * Requires internal role (admin/designer).
+   */
   app.get("/api/reports/card-times", requireAuth, requireRole(...INTERNAL_ROLES), async (req, res) => {
     try {
       const { clientId } = req.query;
@@ -3439,6 +3915,12 @@ export async function registerRoutes(
   });
 
   // === WORKFLOW REPORTS ===
+
+  /**
+   * GET /api/reports/workflow
+   * Generates a workflow report with filters for client, card type, assigned user, and date range.
+   * Requires internal role (admin/designer).
+   */
   app.get("/api/reports/workflow", requireAuth, requireRole(...INTERNAL_ROLES), async (req, res) => {
     try {
       const { clientId, cardType, assignedUserId, startDate, endDate } = req.query;
@@ -3456,6 +3938,12 @@ export async function registerRoutes(
     }
   });
 
+  /**
+   * GET /api/reports/movements
+   * Generates a movement report showing card transitions between columns.
+   * Filterable by client, user, and date range.
+   * Requires internal role (admin/designer).
+   */
   app.get("/api/reports/movements", requireAuth, requireRole(...INTERNAL_ROLES), async (req, res) => {
     try {
       const { clientId, userId, startDate, endDate } = req.query;
@@ -3598,6 +4086,12 @@ export async function registerRoutes(
     }
   });
 
+  /**
+   * POST /api/clients/:clientId/brand-identity
+   * Uploads a brand identity file for a client to Google Drive.
+   * Requires authentication and internal role or client role.
+   * Google Drive must be connected and client must have a Drive folder.
+   */
   app.post("/api/clients/:clientId/brand-identity", requireAuth, requireRole(...INTERNAL_ROLES, "client"), upload.single("file"), async (req, res) => {
     try {
       const clientId = Number(req.params.clientId);
@@ -3634,6 +4128,11 @@ export async function registerRoutes(
     }
   });
 
+  /**
+   * DELETE /api/brand-identity/:id
+   * Deletes a brand identity file record and removes the file from Google Drive.
+   * Requires internal role (admin/designer).
+   */
   app.delete("/api/brand-identity/:id", requireAuth, requireRole(...INTERNAL_ROLES), async (req, res) => {
     try {
       const fileRecord = await storage.getBrandIdentityFile(Number(req.params.id));
@@ -3659,6 +4158,12 @@ export async function registerRoutes(
   });
 
   // === ERROR REPORTS ===
+
+  /**
+   * GET /api/error-reports
+   * Lists error reports with optional filters for status and date range.
+   * Requires admin role.
+   */
   app.get("/api/error-reports", requireAuth, requireRole("admin"), async (req, res) => {
     try {
       const { status, startDate, endDate } = req.query;
@@ -3687,6 +4192,11 @@ export async function registerRoutes(
     }
   });
 
+  /**
+   * PATCH /api/error-reports/:id
+   * Updates an error report. If status is set to "resolvido", records who resolved it and when.
+   * Requires admin role.
+   */
   app.patch("/api/error-reports/:id", requireAuth, requireRole("admin"), async (req, res) => {
     try {
       const updates: any = { ...req.body };
@@ -3702,6 +4212,11 @@ export async function registerRoutes(
     }
   });
 
+  /**
+   * GET /api/documentacao
+   * Serves the DOCUMENTACAO.md file as plain text.
+   * Requires authentication.
+   */
   app.get("/api/documentacao", requireAuth, async (_req, res) => {
     try {
       const fs = await import("fs");
@@ -3719,6 +4234,11 @@ export async function registerRoutes(
   return httpServer;
 }
 
+/**
+ * Seeds the database with initial sample data if no clients or users exist.
+ * Creates sample clients (Moda Bella, TechSafe Solutions, Sabor & Arte),
+ * sample posts, and a default admin user.
+ */
 async function seedDatabase() {
   const existingClients = await storage.getClients();
   if (existingClients.length === 0) {

@@ -1,3 +1,10 @@
+/**
+ * @module kanban-card-modal
+ * Full-featured modal dialog for viewing and editing a single Kanban card.
+ * Supports title/description editing, column/status changes, member and label assignment,
+ * due dates, checklists, file attachments (with Google Drive sync), comments,
+ * activity log, time tracking, cover image, and approval workflows.
+ */
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";

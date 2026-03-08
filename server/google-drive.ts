@@ -1,8 +1,16 @@
 import { google } from 'googleapis';
 
+/** Cached Google OAuth2 client instance, reused across requests. */
 let oauth2Client: any = null;
+
+/** Cached credentials from the database to detect changes and rebuild the OAuth2 client when needed. */
 let cachedCredentials: { clientId: string; clientSecret: string; refreshToken: string } | null = null;
 
+/**
+ * Retrieves Google Drive OAuth credentials from the database system settings.
+ * Falls back to `null` if any required credential is missing or an error occurs.
+ * @returns The credentials object or `null` if not available.
+ */
 async function getCredentialsFromDB(): Promise<{ clientId: string; clientSecret: string; refreshToken: string } | null> {
   try {
     const { storage } = await import('./storage');
@@ -24,11 +32,22 @@ async function getCredentialsFromDB(): Promise<{ clientId: string; clientSecret:
   }
 }
 
+/**
+ * Resets the cached OAuth2 client and credentials, forcing a fresh authentication on next use.
+ * Useful when credentials are updated in settings.
+ */
 export function resetOAuth2Client() {
   oauth2Client = null;
   cachedCredentials = null;
 }
 
+/**
+ * Returns an authenticated Google OAuth2 client.
+ * Reads credentials from environment variables first, then falls back to database settings.
+ * Caches the client and rebuilds it only when credentials change.
+ * @throws Error if no credentials are configured.
+ * @returns The authenticated OAuth2 client instance.
+ */
 async function getOAuth2Client() {
   let clientId = process.env.GOOGLE_CLIENT_ID;
   let clientSecret = process.env.GOOGLE_CLIENT_SECRET;
@@ -62,13 +81,25 @@ async function getOAuth2Client() {
   return oauth2Client;
 }
 
+/**
+ * Creates and returns an authenticated Google Drive API v3 client.
+ * @returns The Google Drive API client.
+ */
 async function getDriveClient() {
   const auth = await getOAuth2Client();
   return google.drive({ version: 'v3', auth });
 }
 
+/** The name of the root folder in Google Drive where all agency content is stored. */
 const ROOT_FOLDER_NAME = "Shift Agency";
 
+/**
+ * Finds an existing folder by name (and optional parent) or creates it if it doesn't exist.
+ * @param drive - The Google Drive API client.
+ * @param name - The folder name to search for or create.
+ * @param parentId - Optional parent folder ID to scope the search.
+ * @returns The ID of the found or newly created folder.
+ */
 async function findOrCreateFolder(drive: any, name: string, parentId?: string): Promise<string> {
   let query = `name='${name.replace(/'/g, "\\'")}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
   if (parentId) {
@@ -101,11 +132,22 @@ async function findOrCreateFolder(drive: any, name: string, parentId?: string): 
   return created.data.id;
 }
 
+/**
+ * Ensures the root "Shift Agency" folder exists in Google Drive.
+ * @returns The folder ID of the root folder.
+ */
 export async function ensureRootFolder(): Promise<string> {
   const drive = await getDriveClient();
   return findOrCreateFolder(drive, ROOT_FOLDER_NAME);
 }
 
+/**
+ * Creates the full folder structure for a client in Google Drive.
+ * Creates a client folder under the root, plus subfolders: Aprovações, Posts Agendados, Briefings, Kanban.
+ * @param clientName - The client's display name.
+ * @param clientId - Optional numeric client ID, appended to the folder name for uniqueness.
+ * @returns An object containing the client folder ID and its Google Drive URL.
+ */
 export async function createClientFolder(clientName: string, clientId?: number): Promise<{ folderId: string; folderUrl: string }> {
   const drive = await getDriveClient();
   const rootId = await findOrCreateFolder(drive, ROOT_FOLDER_NAME);
@@ -123,6 +165,11 @@ export async function createClientFolder(clientName: string, clientId?: number):
   };
 }
 
+/**
+ * Normalizes a file name by adding a date prefix, removing diacritics, and sanitizing special characters.
+ * @param originalName - The original file name to normalize.
+ * @returns A sanitized file name with a `YYYY-MM-DD_HHMM` prefix.
+ */
 function normalizeFileName(originalName: string): string {
   const now = new Date();
   const prefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
@@ -139,6 +186,14 @@ function normalizeFileName(originalName: string): string {
   return `${prefix}_${sanitized || 'arquivo'}${ext.toLowerCase()}`;
 }
 
+/**
+ * Returns the folder ID for a year/month hierarchy (e.g., `2025/06`) under a parent folder.
+ * Creates the year and month folders if they don't exist.
+ * @param drive - The Google Drive API client.
+ * @param parentFolderId - The parent folder ID to create the hierarchy under.
+ * @param date - Optional date to determine the year/month; defaults to the current date.
+ * @returns The folder ID of the month subfolder.
+ */
 async function getYearMonthFolder(drive: any, parentFolderId: string, date?: Date): Promise<string> {
   const d = date || new Date();
   const yearStr = String(d.getFullYear());
@@ -148,6 +203,7 @@ async function getYearMonthFolder(drive: any, parentFolderId: string, date?: Dat
   return monthFolderId;
 }
 
+/** Mapping of file extensions to their corresponding Google Drive subfolder names. */
 const EXTENSION_FOLDER_MAP: Record<string, string> = {
   jpg: "JPG",
   jpeg: "JPG",
@@ -174,6 +230,11 @@ const EXTENSION_FOLDER_MAP: Record<string, string> = {
   csv: "CSV",
 };
 
+/**
+ * Determines the extension-based subfolder name for a given file.
+ * @param fileName - The file name to extract the extension from.
+ * @returns The uppercase extension folder name, or "OUTROS" if unrecognized.
+ */
 function getExtensionFolder(fileName: string): string {
   const parts = fileName.split(".");
   if (parts.length < 2 || !parts[parts.length - 1]) return "OUTROS";
@@ -181,6 +242,15 @@ function getExtensionFolder(fileName: string): string {
   return EXTENSION_FOLDER_MAP[ext] || ext.toUpperCase() || "OUTROS";
 }
 
+/**
+ * Uploads a file to the Kanban section of a client's Google Drive folder.
+ * Organizes files into `YYYY/MM/Kanban/{EXTENSION}/` subfolders.
+ * @param clientFolderId - The client's root Google Drive folder ID.
+ * @param fileName - The original file name.
+ * @param fileBuffer - The file content as a Buffer.
+ * @param mimeType - The MIME type of the file.
+ * @returns An object with the file ID, view URL, download URL, and extension folder name.
+ */
 export async function uploadKanbanFileToDrive(
   clientFolderId: string,
   fileName: string,
@@ -217,6 +287,12 @@ export async function uploadKanbanFileToDrive(
   };
 }
 
+/**
+ * Finds all "Kanban" folders within a client's folder, searching both directly and inside year/month subfolders.
+ * @param drive - The Google Drive API client.
+ * @param parentFolderId - The client's root folder ID to search within.
+ * @returns An array of Kanban folder IDs found.
+ */
 async function findAllKanbanFolders(drive: any, parentFolderId: string): Promise<string[]> {
   const kanbanIds: string[] = [];
 
@@ -256,6 +332,12 @@ async function findAllKanbanFolders(drive: any, parentFolderId: string): Promise
   return kanbanIds;
 }
 
+/**
+ * Lists all extension-based subfolders inside Kanban folders for a client, aggregating file counts.
+ * Searches across all Kanban folders (direct and year/month organized).
+ * @param clientFolderId - The client's root Google Drive folder ID.
+ * @returns A sorted array of objects with folder name, ID, URL, and total file count.
+ */
 export async function listKanbanExtensionFolders(
   clientFolderId: string
 ): Promise<Array<{ name: string; folderId: string; folderUrl: string; fileCount: number }>> {
@@ -296,6 +378,14 @@ export async function listKanbanExtensionFolders(
   return Object.values(aggregated).sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/**
+ * Creates a subfolder for post approvals inside the client's "Aprovações" folder.
+ * Organizes by year/month, then by post title. If a version > 1 is specified, creates a versioned subfolder.
+ * @param clientFolderId - The client's root Google Drive folder ID.
+ * @param postTitle - The title of the post, used as the folder name.
+ * @param version - Optional version number; if > 1, creates a `vN` subfolder inside the post folder.
+ * @returns An object with the approval folder ID and its Google Drive URL.
+ */
 export async function createApprovalSubfolder(
   clientFolderId: string,
   postTitle: string,
@@ -320,6 +410,14 @@ export async function createApprovalSubfolder(
   };
 }
 
+/**
+ * Uploads a file buffer to a specific Google Drive folder.
+ * @param folderId - The target folder ID in Google Drive.
+ * @param fileName - The original file name (will be normalized).
+ * @param fileBuffer - The file content as a Buffer.
+ * @param mimeType - The MIME type of the file.
+ * @returns An object with the uploaded file's ID and view URL.
+ */
 export async function uploadFileToDrive(
   folderId: string,
   fileName: string,
@@ -348,6 +446,14 @@ export async function uploadFileToDrive(
   };
 }
 
+/**
+ * Downloads an image from a URL and uploads it to a Google Drive folder.
+ * @param folderId - The target folder ID in Google Drive.
+ * @param imageUrl - The URL of the image to download.
+ * @param fileName - The desired file name (will be normalized).
+ * @returns An object with the file ID, view URL, and download URL.
+ * @throws Error if the image cannot be fetched from the URL.
+ */
 export async function uploadImageFromUrl(
   folderId: string,
   imageUrl: string,
@@ -384,6 +490,11 @@ export async function uploadImageFromUrl(
   };
 }
 
+/**
+ * Lists all non-folder files in a Google Drive folder, sorted by creation time (newest first).
+ * @param folderId - The folder ID to list files from.
+ * @returns An array of file metadata objects including ID, name, URLs, creation time, and MIME type.
+ */
 export async function listDriveFiles(
   folderId: string
 ): Promise<Array<{ fileId: string; name: string; fileUrl: string; downloadUrl: string; createdTime: string; mimeType: string }>> {
@@ -405,6 +516,11 @@ export async function listDriveFiles(
   }));
 }
 
+/**
+ * Retrieves the download URL for a specific Google Drive file.
+ * @param fileId - The Google Drive file ID.
+ * @returns The direct download URL for the file.
+ */
 export async function getDriveFileDownloadUrl(fileId: string): Promise<string> {
   const drive = await getDriveClient();
   const res = await drive.files.get({
@@ -414,6 +530,12 @@ export async function getDriveFileDownloadUrl(fileId: string): Promise<string> {
   return res.data.webContentLink || `https://drive.google.com/uc?export=download&id=${fileId}`;
 }
 
+/**
+ * Retrieves a readable stream for a Google Drive file, along with its MIME type and name.
+ * Useful for proxying file downloads through the server.
+ * @param fileId - The Google Drive file ID.
+ * @returns An object containing the file stream, MIME type, and file name.
+ */
 export async function getDriveFileStream(fileId: string): Promise<{ stream: any; mimeType: string; name: string }> {
   const drive = await getDriveClient();
   const meta = await drive.files.get({ fileId, fields: 'mimeType, name' });
@@ -423,6 +545,13 @@ export async function getDriveFileStream(fileId: string): Promise<{ stream: any;
   return { stream: res.data, mimeType, name };
 }
 
+/**
+ * Finds all "Aprovações" (Approvals) folders within a client's folder structure.
+ * Searches both directly under the client folder and inside year/month subfolders.
+ * @param drive - The Google Drive API client.
+ * @param clientFolderId - The client's root folder ID.
+ * @returns An array of Aprovações folder IDs found.
+ */
 async function findAllApprovalsFolders(drive: any, clientFolderId: string): Promise<string[]> {
   const approvalIds: string[] = [];
 
@@ -462,6 +591,14 @@ async function findAllApprovalsFolders(drive: any, clientFolderId: string): Prom
   return approvalIds;
 }
 
+/**
+ * Lists all version subfolders for a specific post's approval folder.
+ * Searches across all "Aprovações" folders (direct and year/month organized) to find the post by title.
+ * If files exist directly in the post folder (not in version subfolders), includes a synthetic "v1" entry.
+ * @param clientFolderId - The client's root Google Drive folder ID.
+ * @param postTitle - The post title to search for.
+ * @returns A sorted array of version folder objects with ID, name (e.g., "v1", "v2"), and URL.
+ */
 export async function listApprovalVersionFolders(
   clientFolderId: string,
   postTitle: string
@@ -515,11 +652,20 @@ export async function listApprovalVersionFolders(
   return folders;
 }
 
+/**
+ * Permanently deletes a file from Google Drive.
+ * @param fileId - The Google Drive file ID to delete.
+ */
 export async function deleteDriveFile(fileId: string): Promise<void> {
   const drive = await getDriveClient();
   await drive.files.delete({ fileId });
 }
 
+/**
+ * Checks whether the Google Drive integration is connected and authenticated.
+ * Attempts to fetch the authenticated user's info as a connectivity test.
+ * @returns `true` if connected, `false` otherwise.
+ */
 export async function isDriveConnected(): Promise<boolean> {
   try {
     const drive = await getDriveClient();
@@ -530,6 +676,10 @@ export async function isDriveConnected(): Promise<boolean> {
   }
 }
 
+/**
+ * Retrieves the authenticated Google Drive user's email and display name.
+ * @returns An object with email and name, or `null` if credentials are invalid or not configured.
+ */
 export async function getDriveUserInfo(): Promise<{ email: string; name: string } | null> {
   try {
     const drive = await getDriveClient();

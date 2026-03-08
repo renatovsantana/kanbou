@@ -19,8 +19,10 @@ import { FileText, Plus, Eye, Trash2, Clock, CheckCircle2, Copy, ExternalLink, D
 import type { Briefing, Client, BriefingTemplate, BriefingTemplateQuestion } from "@shared/schema";
 import { isInternalRole } from "@shared/schema";
 
+/** Supported question input types for briefing forms */
 export type QuestionType = "text" | "select" | "multi-select" | "color-picker" | "radio" | "image-upload" | "file-upload";
 
+/** Represents a single question within a briefing phase */
 export interface BriefingQuestion {
   id: string;
   text: string;
@@ -32,12 +34,14 @@ export interface BriefingQuestion {
   maxSizeMB?: number;
 }
 
+/** Represents a phase (section) of a briefing containing grouped questions */
 export interface BriefingPhase {
   phase: number;
   label: string;
   questions: BriefingQuestion[];
 }
 
+/** Default brand briefing questions organized into 4 phases covering the client, company, target audience, and brand personality */
 const BRIEFING_QUESTIONS: BriefingPhase[] = [
   { phase: 1, label: "Sobre o Contratante", questions: [
     { id: "q01", text: "Atualmente, qual sua função dentro dessa empresa?", required: true },
@@ -93,6 +97,13 @@ const BRIEFING_QUESTIONS: BriefingPhase[] = [
 
 export { BRIEFING_QUESTIONS };
 
+/**
+ * Generates HTML content for a standard brand briefing PDF export.
+ * Renders all answered questions organized by phase with styled formatting.
+ * @param briefing - The briefing record containing metadata
+ * @param answers - Key-value map of question IDs to their answers
+ * @returns HTML string ready for print/PDF rendering
+ */
 function generatePdfContent(briefing: Briefing, answers: Record<string, any>): string {
   let html = `
     <html><head><meta charset="utf-8">
@@ -158,6 +169,12 @@ function generatePdfContent(briefing: Briefing, answers: Record<string, any>): s
   return html;
 }
 
+/**
+ * Opens a new browser window with the briefing content formatted for PDF/print export.
+ * Handles both standard brand briefings and custom template-based briefings.
+ * @param briefing - The briefing record to export
+ * @param templates - Optional list of templates for custom briefing resolution
+ */
 export async function exportBriefingPdf(briefing: Briefing, templates?: BriefingTemplate[]) {
   if (!briefing.answers) return;
   let answers: Record<string, any>;
@@ -188,6 +205,13 @@ export async function exportBriefingPdf(briefing: Briefing, templates?: Briefing
   }, 500);
 }
 
+/**
+ * Converts a single answer value into styled HTML based on the question type.
+ * Handles color swatches, image references, file links, badge lists, and plain text.
+ * @param answer - The answer value (string, array, or object)
+ * @param questionType - Optional question type for specialized rendering
+ * @returns HTML string representing the formatted answer
+ */
 function generateAnswerHtml(answer: any, questionType?: string): string {
   if (questionType === "color-picker" && Array.isArray(answer)) {
     let h = "";
@@ -225,6 +249,14 @@ function generateAnswerHtml(answer: any, questionType?: string): string {
   return String(answer);
 }
 
+/**
+ * Generates HTML content for a custom template-based briefing PDF export.
+ * Uses template questions for labels; falls back to generic labels when questions are empty.
+ * @param briefing - The briefing record containing metadata
+ * @param answers - Key-value map of question IDs to their answers
+ * @param questions - The template questions defining the form structure
+ * @returns HTML string ready for print/PDF rendering
+ */
 function generateCustomPdfContent(briefing: Briefing, answers: Record<string, any>, questions: BriefingTemplateQuestion[]): string {
   let html = `
     <html><head><meta charset="utf-8">
@@ -268,6 +300,12 @@ function generateCustomPdfContent(briefing: Briefing, answers: Record<string, an
   return html;
 }
 
+/**
+ * BriefingsPage - Admin page for managing client briefings and briefing templates.
+ * Provides CRUD operations for briefings (create, view, delete, copy link, export PDF)
+ * and template management (create, edit, delete templates with custom questions).
+ * Internal users can create briefings for clients and manage templates.
+ */
 export default function BriefingsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -368,6 +406,7 @@ export default function BriefingsPage() {
     },
   });
 
+  /** Resets the template dialog state to its initial values */
   const resetTemplateDialog = () => {
     setTemplateDialogOpen(false);
     setEditingTemplate(null);
@@ -376,6 +415,7 @@ export default function BriefingsPage() {
     setTemplateQuestions([]);
   };
 
+  /** Opens the template dialog pre-populated with existing template data for editing */
   const openEditTemplate = (template: BriefingTemplate) => {
     setEditingTemplate(template);
     setTemplateName(template.name);
@@ -386,6 +426,7 @@ export default function BriefingsPage() {
     setTemplateDialogOpen(true);
   };
 
+  /** Appends a new empty question to the template question list */
   const addTemplateQuestion = () => {
     setTemplateQuestions(prev => [
       ...prev,
@@ -393,14 +434,17 @@ export default function BriefingsPage() {
     ]);
   };
 
+  /** Updates a template question at the given index with partial data */
   const updateTemplateQuestion = (index: number, updates: Partial<BriefingTemplateQuestion>) => {
     setTemplateQuestions(prev => prev.map((q, i) => i === index ? { ...q, ...updates } : q));
   };
 
+  /** Removes a template question at the given index */
   const removeTemplateQuestion = (index: number) => {
     setTemplateQuestions(prev => prev.filter((_, i) => i !== index));
   };
 
+  /** Validates and saves the current template (creates new or updates existing) */
   const handleSaveTemplate = () => {
     if (!templateName.trim() || templateQuestions.length === 0) return;
     const filteredQuestions = templateQuestions.filter(q => q.text.trim());
@@ -417,6 +461,7 @@ export default function BriefingsPage() {
     }
   };
 
+  /** Creates a new briefing for the selected client with the configured type and title */
   const handleCreate = () => {
     const client = clientsList.find(c => c.id === parseInt(selectedClientId));
     if (!client) return;
@@ -432,15 +477,18 @@ export default function BriefingsPage() {
     createMutation.mutate(payload);
   };
 
+  /** Constructs the public-facing URL for a briefing using its unique token */
   const getBriefingUrl = (token: string) => {
     return `${window.location.origin}/briefing/${token}`;
   };
 
+  /** Copies the briefing public link to the clipboard and shows a toast */
   const copyLink = (token: string) => {
     navigator.clipboard.writeText(getBriefingUrl(token));
     toast({ title: "Link copiado!" });
   };
 
+  /** Renders the briefing answers as a scrollable list, supporting both standard and custom briefing formats */
   const renderAnswers = (briefing: Briefing) => {
     if (!briefing.answers) return null;
     let answers: Record<string, any>;
@@ -524,6 +572,7 @@ export default function BriefingsPage() {
     );
   };
 
+  /** Renders a single answer value as React elements, with specialized display for colors, images, badges, and files */
   const renderAnswerValue = (answer: any, q?: BriefingQuestion) => {
     if (q?.type === "color-picker" && Array.isArray(answer)) {
       return (
@@ -580,6 +629,7 @@ export default function BriefingsPage() {
     return <p className="text-sm">{String(answer)}</p>;
   };
 
+  /** Renders the main briefings list with loading, empty, and populated states */
   const renderBriefingsList = () => {
     if (isLoading) {
       return (

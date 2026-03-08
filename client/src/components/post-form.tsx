@@ -1,3 +1,9 @@
+/**
+ * @module post-form
+ * Reusable form component for creating or editing a social-media post.
+ * Validates input against the shared Drizzle/Zod insert schema (extended with
+ * platform array and date coercion) and supports multi-platform selection.
+ */
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertPostSchema, type Post, type Client } from "@shared/schema";
@@ -30,6 +36,7 @@ import { CalendarIcon, Loader2, Save, Instagram, Facebook, Linkedin, Video, File
 import { cn } from "@/lib/utils";
 import { z } from "zod";
 
+/** Available social-media platforms with their display labels, icons, and colour classes. */
 const PLATFORMS = [
   { value: "Instagram", label: "Instagram", icon: Instagram, color: "text-pink-600" },
   { value: "Facebook", label: "Facebook", icon: Facebook, color: "text-blue-600" },
@@ -38,6 +45,7 @@ const PLATFORMS = [
   { value: "Blog", label: "Blog", icon: FileText, color: "text-orange-600" },
 ];
 
+/** Extended Zod schema for the post form, adding date coercion and platform array validation. */
 const formSchema = insertPostSchema.extend({
   scheduledDate: z.coerce.date(),
   clientId: z.coerce.number().min(1, "Selecione um cliente"),
@@ -47,6 +55,7 @@ const formSchema = insertPostSchema.extend({
 
 type PostFormValues = z.infer<typeof formSchema>;
 
+/** Props for the {@link PostForm} component. */
 interface PostFormProps {
   post?: Post;
   onSuccess?: () => void;

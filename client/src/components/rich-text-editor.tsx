@@ -1,3 +1,11 @@
+/**
+ * @module rich-text-editor
+ * Tiptap-based rich text editor and display components.
+ * Exports:
+ * - `RichTextEditor` – full WYSIWYG editor with toolbar (bold, italic, headings, lists, etc.)
+ * - `RichTextDisplay` – read-only renderer for HTML content produced by the editor.
+ * - `TextareaWithExtras` – plain textarea enhanced with emoji picker and text-template insertion.
+ */
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -32,12 +40,14 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import data from "@emoji-mart/data";
 import Picker from "@emoji-mart/react";
 
+/** Saved text template that can be inserted into the editor. */
 interface TextTemplate {
   id: number;
   name: string;
   content: string;
 }
 
+/** Props for the {@link RichTextEditor} component. */
 interface RichTextEditorProps {
   content: string;
   onChange: (html: string) => void;
@@ -47,6 +57,18 @@ interface RichTextEditorProps {
   templates?: TextTemplate[];
 }
 
+/**
+ * Full WYSIWYG rich-text editor powered by Tiptap.
+ * Supports headings, bold/italic/underline/strikethrough, lists, blockquotes,
+ * text alignment, highlighting, links, undo/redo, and text-template insertion.
+ *
+ * @param content - Initial HTML content.
+ * @param onChange - Callback fired with updated HTML on every edit.
+ * @param placeholder - Placeholder text shown when the editor is empty.
+ * @param editable - Whether the editor accepts input (default `true`).
+ * @param minimal - When `true`, renders a reduced toolbar.
+ * @param templates - Optional list of text templates for quick insertion.
+ */
 export function RichTextEditor({
   content,
   onChange,

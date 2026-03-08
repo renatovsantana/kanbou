@@ -12,6 +12,7 @@ import { CARD_TYPES, TIMED_COLUMNS, type CardType } from "@shared/schema";
 import type { Client, User } from "@shared/schema";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 
+/** Workflow report data with card counts by status, type, client, and average approval time */
 interface WorkflowReport {
   totalCards: number;
   byStatus: Record<string, number>;
@@ -29,12 +30,14 @@ interface WorkflowReport {
   cards: any[];
 }
 
+/** Detail of a single card movement between columns */
 interface MoveDetail {
   from: string;
   to: string;
   movedAt: string;
 }
 
+/** Detailed card-level movement data for a specific user */
 interface UserCardDetail {
   cardId: number;
   cardTitle: string;
@@ -43,6 +46,7 @@ interface UserCardDetail {
   moves: MoveDetail[];
 }
 
+/** Per-user report showing total moves, cards touched, and column movement breakdown */
 interface UserReport {
   userId: number;
   userName: string;
@@ -52,6 +56,7 @@ interface UserReport {
   cards: UserCardDetail[];
 }
 
+/** Aggregated time spent in a specific kanban column across all cards */
 interface ColumnTimeEntry {
   columnName: string;
   totalHours: number;
@@ -59,6 +64,7 @@ interface ColumnTimeEntry {
   totalEntries: number;
 }
 
+/** Full movement report with per-user breakdowns and column time summaries */
 interface MovementReport {
   totalMovements: number;
   totalUsersActive: number;
@@ -67,6 +73,7 @@ interface MovementReport {
   columnTimeReport: ColumnTimeEntry[];
 }
 
+/** Per-card time tracking report showing time spent in each column */
 interface CardTimeReport {
   cardId: number;
   cardTitle: string;
@@ -78,6 +85,11 @@ interface CardTimeReport {
   columnTimes: Record<string, { totalSeconds: number; entries: number; openSince: string | null }>;
 }
 
+/**
+ * Formats a number of seconds into a human-readable string (e.g. "2d 3h 15m").
+ * @param totalSec - Total seconds to format
+ * @returns Formatted duration string
+ */
 function formatSeconds(totalSec: number): string {
   const d = Math.floor(totalSec / 86400);
   const h = Math.floor((totalSec % 86400) / 3600);
@@ -96,6 +108,11 @@ function formatSeconds(totalSec: number): string {
   return `${s}s`;
 }
 
+/**
+ * Formats a number of hours into a human-readable string (e.g. "2h 30m 15s").
+ * @param hours - Hours to format (can include fractional hours)
+ * @returns Formatted duration string
+ */
 function formatHours(hours: number): string {
   const totalSeconds = Math.round(hours * 3600);
   const h = Math.floor(totalSeconds / 3600);
@@ -114,6 +131,7 @@ function formatHours(hours: number): string {
   return `${s}s`;
 }
 
+/** Map of card type keys to Portuguese display labels */
 const CARD_TYPE_LABELS: Record<string, string> = {
   geral: "Geral",
   post: "Post",
@@ -124,6 +142,7 @@ const CARD_TYPE_LABELS: Record<string, string> = {
   identidade_visual: "Identidade Visual",
 };
 
+/** Map of approval status keys to Portuguese display labels */
 const STATUS_LABELS: Record<string, string> = {
   Pendente: "Em Aprovação",
   Aprovado: "Aprovados",
@@ -132,8 +151,15 @@ const STATUS_LABELS: Record<string, string> = {
   sem_aprovacao: "Sem Aprovação",
 };
 
+/** Color palette used for chart segments in report visualizations */
 const CHART_COLORS = ["#84cc16", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#6b7280"];
 
+/**
+ * Reports page component with tabbed views for workflow, user activity, card times, and client activity.
+ * Provides filterable data tables and charts for workflow analytics, user movement tracking,
+ * per-card time-in-column breakdowns, and monthly client activity reports.
+ * Role-aware: clients see only the client activity tab filtered to their client.
+ */
 export default function ReportsPage() {
   const { user } = useAuth();
   const isClient = user?.role === "client";

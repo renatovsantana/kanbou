@@ -1,3 +1,9 @@
+/**
+ * @module client-list
+ * Client management page.
+ * Displays all clients in a searchable, sortable table with inline actions
+ * for creating, editing, archiving, and deleting clients.
+ */
 import { useState } from "react";
 import { useClients, useDeleteClient } from "@/hooks/use-clients";
 import { useQuery, useMutation } from "@tanstack/react-query";

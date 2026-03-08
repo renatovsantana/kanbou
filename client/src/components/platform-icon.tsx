@@ -1,5 +1,15 @@
+/**
+ * @module platform-icon
+ * Renders a coloured Lucide icon representing a social-media platform.
+ */
 import { Instagram, Facebook, Linkedin, Video, Globe, FileText } from "lucide-react";
 
+/**
+ * Renders the appropriate platform icon based on the platform name string.
+ * Falls back to a generic globe icon for unknown platforms.
+ *
+ * @param platform - The platform identifier (e.g. "instagram", "facebook").
+ */
 export function PlatformIcon({ platform }: { platform: string }) {
   if (!platform || typeof platform !== 'string') return null;
   switch (platform.toLowerCase()) {

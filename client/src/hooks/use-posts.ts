@@ -1,8 +1,21 @@
+/**
+ * @module use-posts
+ * TanStack Query hooks for CRUD operations on social-media posts.
+ * Each hook wraps the shared API route definitions, validates payloads with Zod,
+ * and provides toast feedback on success or failure.
+ */
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl, type CreatePostRequest, type UpdatePostRequest } from "@shared/routes";
 import { useToast } from "@/hooks/use-toast";
 
-// GET /api/posts - List all posts
+/**
+ * Fetches all posts, optionally filtered by search term, client, or status.
+ * The query key includes the filters so TanStack Query automatically refetches
+ * when any filter value changes. Auto-refreshes every 30 seconds.
+ *
+ * @param filters - Optional search/client/status filters applied as query params.
+ * @returns A TanStack Query result containing the validated array of posts.
+ */
 export function usePosts(filters?: { search?: string; client?: string; status?: string }) {
   // Construct query key based on filters so it auto-refetches when they change
   const queryKey = filters 
@@ -27,7 +40,13 @@ export function usePosts(filters?: { search?: string; client?: string; status?: 
   });
 }
 
-// GET /api/posts/:id - Single post
+/**
+ * Fetches a single post by ID. Returns `null` on 404.
+ * The query is disabled when `id` is falsy.
+ *
+ * @param id - The post ID to fetch.
+ * @returns A TanStack Query result containing the validated post or `null`.
+ */
 export function usePost(id: number) {
   return useQuery({
     queryKey: [api.posts.get.path, id],
@@ -44,7 +63,13 @@ export function usePost(id: number) {
   });
 }
 
-// POST /api/posts - Create post
+/**
+ * Mutation hook to create a new post.
+ * Validates the payload against the shared Zod schema before sending.
+ * Invalidates the posts list query and shows a toast on completion.
+ *
+ * @returns A TanStack `useMutation` result whose `mutationFn` accepts a `CreatePostRequest`.
+ */
 export function useCreatePost() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -86,7 +111,13 @@ export function useCreatePost() {
   });
 }
 
-// PUT /api/posts/:id - Update post
+/**
+ * Mutation hook to update an existing post.
+ * Validates the payload against the shared Zod schema before sending.
+ * Invalidates the posts list query and shows a toast on completion.
+ *
+ * @returns A TanStack `useMutation` result whose `mutationFn` accepts `{ id, ...UpdatePostRequest }`.
+ */
 export function useUpdatePost() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -129,7 +160,12 @@ export function useUpdatePost() {
   });
 }
 
-// DELETE /api/posts/:id - Delete post
+/**
+ * Mutation hook to delete a post by ID.
+ * Invalidates the posts list query and shows a toast on completion.
+ *
+ * @returns A TanStack `useMutation` result whose `mutationFn` accepts a post `id`.
+ */
 export function useDeletePost() {
   const queryClient = useQueryClient();
   const { toast } = useToast();

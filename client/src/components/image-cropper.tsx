@@ -1,3 +1,9 @@
+/**
+ * @module image-cropper
+ * Dialog component for cropping an image before upload.
+ * Uses `react-easy-crop` for the interactive cropping UI and draws the cropped
+ * region onto an off-screen canvas to produce the final `Blob`.
+ */
 import { useState, useCallback, useEffect } from "react";
 import Cropper from "react-easy-crop";
 import type { Area } from "react-easy-crop";
@@ -6,6 +12,12 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { ZoomIn, ZoomOut, Check, X } from "lucide-react";
 
+/**
+ * Loads an image from a URL and returns the `HTMLImageElement` once ready.
+ *
+ * @param url - The image source URL.
+ * @returns A promise resolving to the loaded image element.
+ */
 async function createImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image();
@@ -16,6 +28,14 @@ async function createImage(url: string): Promise<HTMLImageElement> {
   });
 }
 
+/**
+ * Draws the cropped region of an image onto an off-screen canvas and
+ * returns the result as a PNG `Blob`.
+ *
+ * @param imageSrc - The original image URL.
+ * @param pixelCrop - The crop area in pixel coordinates.
+ * @returns A promise resolving to the cropped image Blob.
+ */
 async function getCroppedImg(imageSrc: string, pixelCrop: Area): Promise<Blob> {
   const image = await createImage(imageSrc);
   const canvas = document.createElement("canvas");
@@ -45,6 +65,7 @@ async function getCroppedImg(imageSrc: string, pixelCrop: Area): Promise<Blob> {
   });
 }
 
+/** Props for the {@link ImageCropper} component. */
 interface ImageCropperProps {
   open: boolean;
   imageSrc: string;

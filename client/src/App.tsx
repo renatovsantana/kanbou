@@ -1,3 +1,9 @@
+/**
+ * @module App
+ * Root application component.
+ * Configures global providers (QueryClient, Theme, Auth, Tooltips),
+ * defines public and protected routes, and dynamically applies server-side branding.
+ */
 import { useEffect } from "react";
 import { Switch, Route, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
@@ -27,6 +33,11 @@ import LoginPage from "@/pages/login";
 import NotFound from "@/pages/not-found";
 import { Loader2 } from "lucide-react";
 
+/**
+ * Renders the authenticated application shell.
+ * Redirects to `/login` when no user session exists; otherwise wraps
+ * all protected page routes inside the shared {@link Layout}.
+ */
 function ProtectedRouter() {
   const { user, isLoading } = useAuth();
 
@@ -65,6 +76,10 @@ function ProtectedRouter() {
   );
 }
 
+/**
+ * Top-level router that separates public routes (login, briefing public, link page)
+ * from the protected application routes.
+ */
 function Router() {
   return (
     <Switch>
@@ -78,6 +93,11 @@ function Router() {
   );
 }
 
+/**
+ * Headless component that applies server-side branding settings.
+ * Updates the document title and favicon based on the `/api/settings/branding` response.
+ * Renders nothing to the DOM.
+ */
 function DynamicBranding() {
   const { data: branding } = useQuery<{ systemName: string; systemFavicon: string; systemTheme: string }>({
     queryKey: ["/api/settings/branding"],
@@ -105,6 +125,11 @@ function DynamicBranding() {
   return null;
 }
 
+/**
+ * Root application component.
+ * Wraps the entire UI tree in the required providers:
+ * QueryClientProvider, TooltipProvider, ThemeProvider, and AuthProvider.
+ */
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
