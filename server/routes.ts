@@ -3461,7 +3461,7 @@ export async function registerRoutes(
     try {
       const user = await getCurrentUser(req);
       if (!user) return res.status(401).json({ message: "Não autenticado" });
-      if (!isInternalRole(user.role)) return res.status(403).json({ message: "Acesso negado" });
+      if (user.role !== "admin") return res.status(403).json({ message: "Acesso negado" });
       const clientId = resolveAiClientId(req, user);
       if (clientId && !(await checkAiClientAccess(user, clientId))) return res.status(403).json({ message: "Sem permissão para este cliente" });
       const { analyzeProductivity } = await import("./ai-agent");

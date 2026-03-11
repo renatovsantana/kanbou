@@ -97,7 +97,7 @@ const AGENT_ACTIONS: AgentAction[] = [
     icon: Timer,
     endpoint: "/api/ai/analyze-productivity",
     requiresClient: false,
-    designerOrAdmin: true,
+    adminOnly: true,
   },
   {
     id: "analyze-errors",
