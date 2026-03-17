@@ -233,12 +233,19 @@ function AboutSection({ clientId, client }: { clientId: number; client?: Client 
   const [editing, setEditing] = useState(false);
   const [about, setAbout] = useState(client?.about || "");
 
+  useEffect(() => {
+    if (!editing) setAbout(client?.about || "");
+  }, [client?.about, editing]);
+
   const saveMutation = useMutation({
     mutationFn: () => apiRequest("PUT", `/api/clients/${clientId}/about`, { about }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       setEditing(false);
       toast({ title: "Sobre salvo com sucesso" });
+    },
+    onError: () => {
+      toast({ title: "Erro ao salvar descrição", variant: "destructive" });
     },
   });
 
@@ -287,12 +294,19 @@ function NotesSection({ clientId, client }: { clientId: number; client?: Client 
   const [editing, setEditing] = useState(false);
   const [notes, setNotes] = useState(client?.notes || "");
 
+  useEffect(() => {
+    if (!editing) setNotes(client?.notes || "");
+  }, [client?.notes, editing]);
+
   const saveMutation = useMutation({
     mutationFn: () => apiRequest("PUT", `/api/clients/${clientId}/notes`, { notes }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       setEditing(false);
       toast({ title: "Anotações salvas com sucesso" });
+    },
+    onError: () => {
+      toast({ title: "Erro ao salvar anotações", variant: "destructive" });
     },
   });
 
@@ -581,33 +595,43 @@ function CrudSection<T extends { id: number }>({
   const [editingItem, setEditingItem] = useState<T | null>(null);
   const [formData, setFormData] = useState<Record<string, string>>({});
 
+  const itemBaseUrl = baseUrl.replace(/\/\d+\//, "/") + "/";
+
   const createMutation = useMutation({
-    mutationFn: (data: Record<string, string>) => apiRequest("POST", `${baseUrl}`, data),
+    mutationFn: (data: Record<string, string>) => apiRequest("POST", baseUrl, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey });
       setAdding(false);
       setFormData({});
       toast({ title: `${title} adicionado` });
     },
+    onError: () => {
+      toast({ title: `Erro ao adicionar ${title.toLowerCase()}`, variant: "destructive" });
+    },
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: Record<string, string> }) =>
-      apiRequest("PUT", `${baseUrl.replace(/\/\d+\//, "/").replace(/\/[^/]+$/, "")}/${id}`, data),
+      apiRequest("PUT", `${itemBaseUrl}${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey });
       setEditingItem(null);
       setFormData({});
       toast({ title: `${title} atualizado` });
     },
+    onError: () => {
+      toast({ title: `Erro ao atualizar ${title.toLowerCase()}`, variant: "destructive" });
+    },
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) =>
-      apiRequest("DELETE", `${baseUrl.replace(/\/\d+\//, "/").replace(/\/[^/]+$/, "")}/${id}`),
+    mutationFn: (id: number) => apiRequest("DELETE", `${itemBaseUrl}${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey });
       toast({ title: `${title} removido` });
+    },
+    onError: () => {
+      toast({ title: `Erro ao remover ${title.toLowerCase()}`, variant: "destructive" });
     },
   });
 
@@ -787,6 +811,9 @@ function CredentialsSection({ clientId, credentials }: { clientId: number; crede
       setForm({ platform: "", username: "", password: "", notes: "" });
       toast({ title: "Credencial adicionada" });
     },
+    onError: () => {
+      toast({ title: "Erro ao adicionar credencial", variant: "destructive" });
+    },
   });
 
   const updateMutation = useMutation({
@@ -796,6 +823,9 @@ function CredentialsSection({ clientId, credentials }: { clientId: number; crede
       setEditingId(null);
       toast({ title: "Credencial atualizada" });
     },
+    onError: () => {
+      toast({ title: "Erro ao atualizar credencial", variant: "destructive" });
+    },
   });
 
   const deleteMutation = useMutation({
@@ -803,6 +833,9 @@ function CredentialsSection({ clientId, credentials }: { clientId: number; crede
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/onboarding", clientId, "credentials"] });
       toast({ title: "Credencial removida" });
+    },
+    onError: () => {
+      toast({ title: "Erro ao remover credencial", variant: "destructive" });
     },
   });
 
@@ -1122,12 +1155,19 @@ function AccessSection({ clientId, users, accessUserIds }: { clientId: number; u
   const [selected, setSelected] = useState<number[]>(accessUserIds);
   const [editing, setEditing] = useState(false);
 
+  useEffect(() => {
+    if (!editing) setSelected(accessUserIds);
+  }, [accessUserIds, editing]);
+
   const saveMutation = useMutation({
     mutationFn: () => apiRequest("PUT", `/api/onboarding/${clientId}/access`, { userIds: selected }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/onboarding", clientId, "access"] });
       setEditing(false);
       toast({ title: "Acesso atualizado" });
+    },
+    onError: () => {
+      toast({ title: "Erro ao salvar controle de acesso", variant: "destructive" });
     },
   });
 
@@ -1231,6 +1271,9 @@ function KanbanSettingsSection({ clientId, client }: { clientId: number; client?
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       toast({ title: "Configuração salva" });
     },
+    onError: () => {
+      toast({ title: "Erro ao salvar configuração", variant: "destructive" });
+    },
   });
 
   const createTemplateMutation = useMutation({
@@ -1241,6 +1284,9 @@ function KanbanSettingsSection({ clientId, client }: { clientId: number; client?
       setAdding(false);
       setTemplateForm({ name: "", content: "" });
       toast({ title: "Template criado" });
+    },
+    onError: () => {
+      toast({ title: "Erro ao criar template", variant: "destructive" });
     },
   });
 
@@ -1253,6 +1299,9 @@ function KanbanSettingsSection({ clientId, client }: { clientId: number; client?
       setTemplateForm({ name: "", content: "" });
       toast({ title: "Template atualizado" });
     },
+    onError: () => {
+      toast({ title: "Erro ao atualizar template", variant: "destructive" });
+    },
   });
 
   const deleteTemplateMutation = useMutation({
@@ -1261,6 +1310,9 @@ function KanbanSettingsSection({ clientId, client }: { clientId: number; client?
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/onboarding", clientId, "text-templates"] });
       toast({ title: "Template removido" });
+    },
+    onError: () => {
+      toast({ title: "Erro ao remover template", variant: "destructive" });
     },
   });
 
@@ -1737,6 +1789,9 @@ function LinkPageSection({ clientId, client }: { clientId: number; client?: Clie
       setNewLink({ name: "", url: "", icon: "link" });
       toast({ title: "Link adicionado" });
     },
+    onError: () => {
+      toast({ title: "Erro ao adicionar link", variant: "destructive" });
+    },
   });
 
   const deleteLinkMutation = useMutation({
@@ -1744,6 +1799,9 @@ function LinkPageSection({ clientId, client }: { clientId: number; client?: Clie
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/onboarding", clientId, "custom-links"] });
       toast({ title: "Link removido" });
+    },
+    onError: () => {
+      toast({ title: "Erro ao remover link", variant: "destructive" });
     },
   });
 
