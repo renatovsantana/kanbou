@@ -343,6 +343,10 @@ function TagsSection({ clientId, client }: { clientId: number; client?: Client }
   const [tags, setTags] = useState<string[]>(client?.tags || []);
   const [newTag, setNewTag] = useState("");
 
+  useEffect(() => {
+    if (!editing) setTags(client?.tags || []);
+  }, [client?.tags, editing]);
+
   const saveMutation = useMutation({
     mutationFn: () => apiRequest("PUT", `/api/clients/${clientId}/tags`, { tags }),
     onSuccess: () => {
@@ -350,14 +354,20 @@ function TagsSection({ clientId, client }: { clientId: number; client?: Client }
       setEditing(false);
       toast({ title: "Tags salvas com sucesso" });
     },
+    onError: () => {
+      toast({ title: "Erro ao salvar tags", variant: "destructive" });
+    },
   });
 
   const addTag = () => {
-    const t = newTag.trim().toLowerCase();
-    if (t && !tags.includes(t)) {
-      setTags([...tags, t]);
-      setNewTag("");
+    const t = newTag.trim().toLowerCase().replace(/^#+/, "");
+    setNewTag("");
+    if (!t) return;
+    if (tags.includes(t)) {
+      toast({ title: `"${t}" já foi adicionada`, variant: "destructive" });
+      return;
     }
+    setTags([...tags, t]);
   };
 
   return (
@@ -449,14 +459,20 @@ function MarketTagsSection({ clientId, client }: { clientId: number; client?: Cl
       setEditing(false);
       toast({ title: "Tags de mercado salvas" });
     },
+    onError: () => {
+      toast({ title: "Erro ao salvar palavras-chave", variant: "destructive" });
+    },
   });
 
   const addTag = () => {
-    const t = newTag.trim().toLowerCase();
-    if (t && !tags.includes(t)) {
-      setTags([...tags, t]);
-      setNewTag("");
+    const t = newTag.trim().toLowerCase().replace(/^#+/, "");
+    setNewTag("");
+    if (!t) return;
+    if (tags.includes(t)) {
+      toast({ title: `"${t}" já foi adicionada`, variant: "destructive" });
+      return;
     }
+    setTags([...tags, t]);
   };
 
   return (
